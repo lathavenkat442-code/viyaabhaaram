@@ -1,0 +1,7 @@
+{
+  "name": "Copy of Copy of Copy of Copy of Copy of Copy of Viyabaaram- Tamil Accounting & Stock",
+  "description": "An easy-to-use Tamil accounting and inventory management app with photo-based stock tracking and income/expense monitoring.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
