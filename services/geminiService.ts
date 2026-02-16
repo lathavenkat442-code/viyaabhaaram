@@ -27,11 +27,11 @@ const getRandomTips = (count: number) => {
 
 export const getBusinessInsights = async (stocks: StockItem[], transactions: Transaction[]) => {
   // Return fallbacks if no API key is set
-  if (! import.meta.env.VITE_API_KEY) {
+  if (!process.env.API_KEY) {
      return getRandomTips(3);
   }
 
-  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_API_KEY });
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   // Optimize payload: Convert to simple strings to avoid complex JSON nesting issues and reduce token count
   const stockSummary = stocks.slice(0, 10).map(s => { 

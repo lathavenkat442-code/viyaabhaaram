@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'viyabaari-v5-fix';
+const CACHE_NAME = 'viyabaari-v6-fix-supabase';
 const urlsToCache = [
   './',
   './index.html',
