@@ -1,8 +1,18 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { StockItem, StockVariant } from '../types';
-import { Search, Trash2, Filter, Edit2, Package, AlertTriangle, Share2, X, ChevronLeft, ChevronRight, Info } from 'lucide-react';
+import { Search, Trash2, Filter, Edit2, Package, AlertTriangle, Share2, X, ChevronLeft, ChevronRight, Info, History } from 'lucide-react';
 import { TRANSLATIONS } from '../constants';
+
+const getTamilHistoryDescription = (desc: string) => {
+    switch(desc) {
+        case 'Item Created': return 'பொருள் சேர்க்கப்பட்டது';
+        case 'Price Updated': return 'விலை மாற்றப்பட்டது';
+        case 'Stock Quantity Updated': return 'ஸ்டாக் அளவு மாற்றப்பட்டது';
+        case 'Item Details Updated': return 'விவரங்கள் மாற்றப்பட்டன';
+        default: return desc;
+    }
+}
 
 // --- Stock Detail Full Screen Modal ---
 const StockDetailView: React.FC<{ item: StockItem; onClose: () => void; onEdit: () => void; onDelete: () => void; onShare: () => void; language: 'ta' | 'en' }> = ({ item, onClose, onEdit, onDelete, onShare, language }) => {
@@ -19,6 +29,7 @@ const StockDetailView: React.FC<{ item: StockItem; onClose: () => void; onEdit: 
 
     const variants = item.variants || [];
     const totalQty = variants.reduce((acc, v) => acc + v.sizeStocks.reduce((sum, s) => sum + s.quantity, 0), 0);
+    const history = item.history || [];
 
     const getSleeveLabel = (sleeve: string) => {
         if (sleeve === 'Full Hand') return language === 'ta' ? 'முழுக்கை' : 'Full Hand';
@@ -161,6 +172,39 @@ const StockDetailView: React.FC<{ item: StockItem; onClose: () => void; onEdit: 
                             )}
                         </div>
                     </div>
+
+                    {/* History Section */}
+                    {history.length > 0 && (
+                       <div className="mt-6 border-t border-gray-100 pt-6">
+                           <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                               <History size={18} className="text-gray-400"/>
+                               {language === 'ta' ? 'வரலாறு (History)' : 'History'}
+                           </h3>
+                           <div className="space-y-4 relative before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-gray-100 pl-1">
+                               {history.map((h, i) => (
+                                   <div key={i} className="relative pl-8 animate-in slide-in-from-bottom-2 fade-in duration-500" style={{ animationDelay: `${i * 100}ms` }}>
+                                       <div className={`absolute left-0 top-1 w-4 h-4 rounded-full border-2 border-white shadow-sm z-10 ${
+                                           h.action === 'CREATED' ? 'bg-green-500' : 
+                                           h.action === 'PRICE_CHANGE' ? 'bg-orange-500' :
+                                           h.action === 'STOCK_CHANGE' ? 'bg-blue-500' : 'bg-gray-400'
+                                       }`}></div>
+                                       
+                                       <p className="text-xs font-bold text-gray-800">
+                                           {language === 'ta' ? getTamilHistoryDescription(h.description) : h.description}
+                                       </p>
+                                       {h.change && (
+                                           <p className="text-[10px] font-mono text-gray-500 mt-1 bg-gray-50 inline-block px-2 py-0.5 rounded border border-gray-100">
+                                               {h.change}
+                                           </p>
+                                       )}
+                                       <p className="text-[9px] text-gray-400 mt-1 font-medium">
+                                           {new Date(h.date).toLocaleString(language)}
+                                       </p>
+                                   </div>
+                               ))}
+                           </div>
+                       </div>
+                    )}
                 </div>
             </div>
 

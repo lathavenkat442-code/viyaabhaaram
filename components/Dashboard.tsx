@@ -2,12 +2,15 @@
 import React, { useState, useEffect } from 'react';
 import { StockItem, Transaction } from '../types';
 import { TRANSLATIONS } from '../constants';
-import { TrendingUp, TrendingDown, Package, Sparkles } from 'lucide-react';
+import { TrendingUp, TrendingDown, Package, Sparkles, Lightbulb } from 'lucide-react';
 import { getBusinessInsights } from '../services/geminiService';
 
 const Dashboard: React.FC<{ stocks: StockItem[]; transactions: Transaction[]; language: 'ta' | 'en' }> = ({ stocks, transactions, language }) => {
   const [tips, setTips] = useState<string[]>([]);
   const [loadingTips, setLoadingTips] = useState(false);
+  
+  // Check if API Key exists
+  const hasApiKey = !!process.env.API_KEY;
 
   const t = TRANSLATIONS[language];
 
@@ -59,13 +62,11 @@ const Dashboard: React.FC<{ stocks: StockItem[]; transactions: Transaction[]; la
       setLoadingTips(false);
     };
 
-    // Only fetch if there is data to analyze
-    if (stocks.length > 0 || transactions.length > 0) {
-      // Use a timeout to debounce slightly on mount
-      const timer = setTimeout(fetchTips, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [stocks.length, transactions.length]); // Only re-run if number of items changes to minimize calls
+    // Only fetch if there is data to analyze or if we need fallback tips
+    // Use a timeout to debounce slightly on mount
+    const timer = setTimeout(fetchTips, 500);
+    return () => clearTimeout(timer);
+  }, [stocks.length, transactions.length]); 
 
   return (
     <div className="p-4 space-y-6">
@@ -108,8 +109,13 @@ const Dashboard: React.FC<{ stocks: StockItem[]; transactions: Transaction[]; la
 
       <div className="bg-indigo-50 rounded-2xl p-5 border border-indigo-100">
         <div className="flex items-center gap-2 mb-4">
-          <Sparkles className="text-indigo-600" size={18} />
-          <h3 className="font-bold text-indigo-900 tamil-font">{language === 'ta' ? 'AI ஆலோசனை' : 'AI Business Insights'}</h3>
+          {hasApiKey ? <Sparkles className="text-indigo-600" size={18} /> : <Lightbulb className="text-amber-500" size={18} />}
+          <h3 className="font-bold text-indigo-900 tamil-font">
+              {hasApiKey 
+                ? (language === 'ta' ? 'AI ஆலோசனை' : 'AI Business Insights') 
+                : (language === 'ta' ? 'வணிக குறிப்புகள்' : 'Business Tips')
+              }
+          </h3>
         </div>
         {loadingTips ? (
           <div className="animate-pulse space-y-2">

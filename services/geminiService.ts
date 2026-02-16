@@ -10,7 +10,14 @@ const FALLBACK_TIPS = [
   "பண்டிகை காலங்களில் சிறப்புச் சலுகைகளை வழங்கலாம்.",
   "தினசரி வரவு செலவு கணக்கை தவறாமல் எழுதவும்.",
   "பழைய சரக்குகளை தள்ளுபடியில் விற்று பணமாக்கவும்.",
-  "அவசர தேவைக்கு எப்போதும் சிறு தொகை கையில் இருக்கட்டும்."
+  "அவசர தேவைக்கு எப்போதும் சிறு தொகை கையில் இருக்கட்டும்.",
+  "வாடிக்கையாளர்களிடம் கனிவாக பேசி நன்மதிப்பை பெறவும்.",
+  "தினமும் கடையை குறித்த நேரத்தில் திறக்கவும்.",
+  "போட்டியாளர்களின் விலையை கவனித்து செயல்படவும்.",
+  "பணத்தை விட வாடிக்கையாளர் திருப்தியே முக்கியம்.",
+  "வாரத்திற்கு ஒருமுறை ஸ்டாக் சரிபார்க்கவும்.",
+  "புகழ்பெற்ற பிராண்டுகளை விற்பனைக்கு வைக்கவும்.",
+  "சிறு லாபம், அதிக விற்பனை என்ற கொள்கையை பின்பற்றவும்."
 ];
 
 const getRandomTips = (count: number) => {
@@ -20,11 +27,11 @@ const getRandomTips = (count: number) => {
 
 export const getBusinessInsights = async (stocks: StockItem[], transactions: Transaction[]) => {
   // Return fallbacks if no API key is set
-  if (!import.meta.env.VITE_API_KEY) {
+  if (!process.env.API_KEY) {
      return getRandomTips(3);
   }
 
-  const ai = new GoogleGenAI({ apiKey: ! import.meta.env.VITE_API_KEY });
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   // Optimize payload: Convert to simple strings to avoid complex JSON nesting issues and reduce token count
   const stockSummary = stocks.slice(0, 10).map(s => { 

@@ -4,17 +4,30 @@
   "short_name": "Viyabaari",
   "description": "Easy Tamil accounting & inventory app. Manage stock with photos, track income/expenses, and view AI insights.",
   "id": "com.viyabaari.app",
-  "start_url": "./index.html",
-  "scope": "./",
+  "start_url": "/index.html",
+  "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#f8fafc",
   "theme_color": "#4f46e5",
+  "lang": "ta",
+  "dir": "ltr",
+  "prefer_related_applications": false,
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  },
+  "display_override": ["window-controls-overlay", "minimal-ui"],
   "categories": ["business", "finance", "productivity"],
   "icons": [
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/3045/3045388.png",
+      "src": "https://ui-avatars.com/api/?name=V&background=4f46e5&color=fff&size=192&rounded=true&font-size=0.6",
       "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3045/3045388.png",
+      "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
@@ -29,17 +42,24 @@
     {
       "name": "Add Transaction",
       "short_name": "Entries",
-      "url": "./index.html",
-      "icons": [{ "src": "https://cdn-icons-png.flaticon.com/512/3045/3045388.png", "sizes": "192x192" }]
+      "url": "/index.html",
+      "icons": [{ "src": "https://ui-avatars.com/api/?name=Tx&background=4f46e5&color=fff&size=192&rounded=true", "sizes": "192x192", "type": "image/png" }]
     }
   ],
   "screenshots": [
     {
-      "src": "https://images.unsplash.com/photo-1556742049-0cfed4f7a07d?auto=format&fit=crop&w=400&q=80",
-      "sizes": "400x800",
+      "src": "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=400&q=80",
+      "sizes": "400x600",
       "type": "image/jpeg",
       "form_factor": "narrow",
       "label": "Inventory Management"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1664575602276-acd073f104c1?auto=format&fit=crop&w=1280&q=80",
+      "sizes": "1280x853",
+      "type": "image/jpeg",
+      "form_factor": "wide",
+      "label": "Desktop Dashboard"
     }
   ]
 }

@@ -14,6 +14,13 @@ export interface StockVariant {
   sizeStocks: SizeStock[];
 }
 
+export interface StockHistory {
+  date: number;
+  action: 'CREATED' | 'UPDATED' | 'PRICE_CHANGE' | 'STOCK_CHANGE';
+  description: string;
+  change?: string;
+}
+
 export interface StockItem {
   id: string;
   name: string;
@@ -25,6 +32,7 @@ export interface StockItem {
   variants: StockVariant[]; // New: Each image has its own stock
   price: number;
   lastUpdated: number;
+  history?: StockHistory[]; // New: Track price and stock changes
 }
 
 export interface Transaction {
@@ -32,6 +40,7 @@ export interface Transaction {
   type: TransactionType;
   amount: number;
   category: string;
+  partyName?: string; // New: Customer or Dealer Name for Ledger
   description: string;
   date: number;
 }
@@ -39,6 +48,7 @@ export interface Transaction {
 export type BackupFrequency = 'daily' | 'weekly' | 'monthly' | 'never';
 
 export interface User {
+  uid?: string; // Added for Supabase Auth ID
   email: string;
   name: string;
   mobile?: string; // Added mobile number

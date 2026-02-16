@@ -48,7 +48,13 @@ export const TRANSLATIONS = {
     halfHand: 'அரைக்கை',
     size: 'சைஸ்',
     skipLogin: 'உள்நுழையாமல் தொடரவும்',
-    selectColor: 'நிறத்தை தேர்ந்தெடுக்கவும்'
+    selectColor: 'நிறத்தை தேர்ந்தெடுக்கவும்',
+    partyName: 'பெயர் (Customer/Dealer)',
+    ledger: 'பேரேடு (Ledger)',
+    transactions: 'பரிவர்த்தனைகள்',
+    receivable: 'நமக்கு வரவேண்டியது',
+    payable: 'நாம் தரவேண்டியது',
+    netBalance: 'மொத்த கணக்கு'
   },
   en: {
     appName: 'Viyabaari',
@@ -96,7 +102,13 @@ export const TRANSLATIONS = {
     halfHand: 'Half Hand',
     size: 'Size',
     skipLogin: 'Skip Login (Guest Mode)',
-    selectColor: 'Select Color'
+    selectColor: 'Select Color',
+    partyName: 'Party Name (Customer/Dealer)',
+    ledger: 'Ledger',
+    transactions: 'Transactions',
+    receivable: 'Receivable',
+    payable: 'Payable',
+    netBalance: 'Net Balance'
   }
 };
 
