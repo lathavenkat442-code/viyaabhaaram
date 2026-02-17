@@ -16,11 +16,12 @@ let supabaseInstance: SupabaseClient;
 
 // Mock client generator to prevent runtime crashes
 const createMockClient = () => {
-  console.warn("Viyabaari: Supabase credentials missing or invalid. App running in offline/demo mode.");
+  // Use console.log or info instead of warn to avoid aggressive overlay errors in some dev tools
+  console.info("Viyabaari: Supabase credentials missing. App running in offline/demo mode.");
   
   const dummyPromise = Promise.resolve({ 
     data: null, 
-    error: { message: "Supabase not configured. Check console for details." } 
+    error: { message: "Supabase not configured (Offline Mode)" } 
   });
   
   const dummyChain: any = {
@@ -43,8 +44,15 @@ const createMockClient = () => {
       signUp: () => dummyPromise,
       signInWithPassword: () => dummyPromise,
       signOut: () => dummyPromise,
+      resetPasswordForEmail: () => dummyPromise
     },
-    from: () => dummyChain
+    from: () => dummyChain,
+    channel: () => ({
+        on: () => ({ on: () => ({ subscribe: () => {} }) }),
+        subscribe: () => {},
+        unsubscribe: () => {}
+    }),
+    removeChannel: () => {}
   } as unknown as SupabaseClient;
 };
 
