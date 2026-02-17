@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { User, StockItem, Transaction, BackupFrequency } from '../types';
-import { LogOut, ShieldCheck, Download, FileSpreadsheet, HardDriveDownload, Globe, CheckCircle2, UploadCloud, Save, Cloud, Calendar, History, Settings, ToggleLeft, ToggleRight, Image, UserCircle2, X, AlertTriangle, Eraser, Trash2 } from 'lucide-react';
+import { LogOut, ShieldCheck, Download, FileSpreadsheet, HardDriveDownload, Globe, CheckCircle2, UploadCloud, Save, Cloud, Calendar, History, Settings, ToggleLeft, ToggleRight, Image, UserCircle2, X, AlertTriangle, Eraser, Trash2, ChevronDown } from 'lucide-react';
 
 interface ProfileProps {
   user: User;
@@ -20,6 +20,7 @@ const Profile: React.FC<ProfileProps> = ({ user, updateUser, stocks, transaction
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [tempAccountInput, setTempAccountInput] = useState('');
+  const [showFrequencyDropdown, setShowFrequencyDropdown] = useState(false);
 
   const downloadFile = (content: string, filename: string, type: string) => {
     try {
@@ -113,10 +114,17 @@ const Profile: React.FC<ProfileProps> = ({ user, updateUser, stocks, transaction
     });
   };
 
-  const updateFrequency = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const frequencyOptions = [
+    { value: 'daily', label: language === 'ta' ? 'தினசரி' : 'Daily' },
+    { value: 'weekly', label: language === 'ta' ? 'வாரம் ஒருமுறை' : 'Weekly' },
+    { value: 'monthly', label: language === 'ta' ? 'மாதம் ஒருமுறை' : 'Monthly' },
+    { value: 'never', label: language === 'ta' ? 'வேண்டாம்' : 'Never' }
+  ];
+
+  const updateFrequency = (val: string) => {
     updateUser({
       ...user,
-      backupFrequency: e.target.value as BackupFrequency
+      backupFrequency: val as BackupFrequency
     });
   };
 
@@ -257,23 +265,45 @@ const Profile: React.FC<ProfileProps> = ({ user, updateUser, stocks, transaction
                  <Settings size={16} className="text-gray-400" />
               </button>
 
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl">
+              {/* Custom Dropdown for Backup Frequency */}
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl relative z-20">
                  <div className="flex items-center gap-3">
                     <Calendar size={18} className="text-gray-400" />
                     <div>
                        <p className="text-xs font-black text-gray-700 tamil-font">{language === 'ta' ? 'பேக்கப் நினைவூட்டல்' : 'Back up frequency'}</p>
                     </div>
                  </div>
-                 <select 
-                    value={user.backupFrequency || 'weekly'} 
-                    onChange={updateFrequency}
-                    className="bg-transparent text-xs font-bold text-indigo-600 outline-none cursor-pointer text-right"
-                 >
-                    <option value="daily">{language === 'ta' ? 'தினசரி' : 'Daily'}</option>
-                    <option value="weekly">{language === 'ta' ? 'வாரம் ஒருமுறை' : 'Weekly'}</option>
-                    <option value="monthly">{language === 'ta' ? 'மாதம் ஒருமுறை' : 'Monthly'}</option>
-                    <option value="never">{language === 'ta' ? 'வேண்டாம்' : 'Never'}</option>
-                 </select>
+                 
+                 <div className="relative">
+                    <button 
+                        onClick={() => setShowFrequencyDropdown(!showFrequencyDropdown)}
+                        className="flex items-center gap-2 text-xs font-bold text-indigo-600 outline-none"
+                    >
+                        <span>{frequencyOptions.find(o => o.value === (user.backupFrequency || 'weekly'))?.label}</span>
+                        <ChevronDown size={14} className={`transition-transform ${showFrequencyDropdown ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {showFrequencyDropdown && (
+                        <div className="absolute top-full right-0 mt-2 w-40 bg-white border border-gray-100 rounded-xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2">
+                            {frequencyOptions.map(opt => (
+                                <div 
+                                    key={opt.value}
+                                    onClick={() => {
+                                        updateFrequency(opt.value);
+                                        setShowFrequencyDropdown(false);
+                                    }}
+                                    className={`px-4 py-3 text-xs font-bold cursor-pointer hover:bg-indigo-50 border-b border-gray-50 last:border-0 ${user.backupFrequency === opt.value ? 'text-indigo-600 bg-indigo-50' : 'text-gray-600'}`}
+                                >
+                                    {opt.label}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                 </div>
+                 {/* Backdrop to close */}
+                 {showFrequencyDropdown && (
+                    <div className="fixed inset-0 z-[-1]" onClick={() => setShowFrequencyDropdown(false)}></div>
+                 )}
               </div>
 
               {/* Include Photos Toggle */}

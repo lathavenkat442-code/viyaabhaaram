@@ -1,5 +1,6 @@
 
 {
+  "id": "viyabaari_tamil_manager",
   "name": "Viyabaari - Tamil Business Manager",
   "short_name": "Viyabaari",
   "description": "Easy Tamil accounting & inventory app. Manage stock with photos, track income/expenses, and view AI insights.",
@@ -12,8 +13,20 @@
   "lang": "ta",
   "dir": "ltr",
   "prefer_related_applications": false,
+  "related_applications": [],
   "display_override": ["window-controls-overlay", "minimal-ui"],
   "categories": ["business", "finance", "productivity"],
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  },
+  "file_handlers": [
+    {
+      "action": "/",
+      "accept": {
+        "application/json": [".json"]
+      }
+    }
+  ],
   "icons": [
     {
       "src": "https://ui-avatars.com/api/?name=V&background=4f46e5&color=fff&size=192&rounded=true&font-size=0.6",
@@ -32,6 +45,29 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "https://images.unsplash.com/photo-1556742049-0cfed4f7a07d?auto=format&fit=crop&w=1080&h=1920&q=80",
+      "sizes": "1080x1920",
+      "type": "image/jpeg",
+      "form_factor": "narrow",
+      "label": "Mobile Dashboard"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1920&h=1080&q=80",
+      "sizes": "1920x1080",
+      "type": "image/jpeg",
+      "form_factor": "wide",
+      "label": "Desktop Analytics"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1556740738-b6a63e27c4df?auto=format&fit=crop&w=1080&h=1920&q=80",
+      "sizes": "1080x1920",
+      "type": "image/jpeg",
+      "form_factor": "narrow",
+      "label": "Stock Management"
     }
   ],
   "shortcuts": [

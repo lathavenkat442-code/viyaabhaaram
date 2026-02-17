@@ -682,6 +682,8 @@ const App: React.FC = () => {
   const fetchData = useCallback(async (isManualRefresh = false) => {
       if (!user) return;
       
+      let fetchedFromOnline = false;
+
       if (user.uid && navigator.onLine) {
           if (isManualRefresh) setIsSyncing(true);
           try {
@@ -691,13 +693,14 @@ const App: React.FC = () => {
                   .select('content')
                   .eq('user_id', user.uid);
               
-              if (stockData) {
+              if (stockData && !stockError) {
                   const parsedStocks = stockData.map((row: any) => row.content);
                   // Sort by lastUpdated desc to show newest changes
                   parsedStocks.sort((a: StockItem, b: StockItem) => b.lastUpdated - a.lastUpdated);
                   setStocks(parsedStocks);
                   // Update local cache
                   localStorage.setItem(`viyabaari_stocks_${user.email}`, JSON.stringify(parsedStocks));
+                  fetchedFromOnline = true;
               }
 
               // Fetch Transactions
@@ -706,13 +709,14 @@ const App: React.FC = () => {
                   .select('content')
                   .eq('user_id', user.uid);
 
-              if (txnData) {
+              if (txnData && !txnError) {
                   const parsedTxns = txnData.map((row: any) => row.content);
                   // Sort transactions by date desc
                   parsedTxns.sort((a: Transaction, b: Transaction) => b.date - a.date);
                   setTransactions(parsedTxns);
                   // Update local cache
                   localStorage.setItem(`viyabaari_txns_${user.email}`, JSON.stringify(parsedTxns));
+                  fetchedFromOnline = true;
               }
 
           } catch (err) {
@@ -722,8 +726,11 @@ const App: React.FC = () => {
                   setTimeout(() => setIsSyncing(false), 500); // Small delay for visual feedback
               }
           }
-      } else {
-           // Load from Local Storage if offline or guest
+      } 
+      
+      // Fallback: If offline OR if online fetch failed (empty/error), load from LocalStorage
+      if (!fetchedFromOnline) {
+           // Load from Local Storage if offline or guest or online fetch failed
            const savedStocks = localStorage.getItem(`viyabaari_stocks_${user.email}`);
            const savedTxns = localStorage.getItem(`viyabaari_txns_${user.email}`);
            if (savedStocks) setStocks(JSON.parse(savedStocks));
@@ -833,7 +840,10 @@ const App: React.FC = () => {
             user_id: user.uid,
             content: newItem
         });
-        if (error) console.error("Sync Error:", error);
+        if (error) {
+            console.error("Sync Error:", error);
+            alert(`ஆன்லைன் சேமிப்பு தோல்வி (Online Save Failed): ${error.message}. தயவுசெய்து Supabase SQL Tables உருவாக்கப்பட்டதா என சரிபார்க்கவும்.`);
+        }
     }
     // Update Local Cache
     if (user?.email) {
@@ -871,19 +881,22 @@ const App: React.FC = () => {
      if (securityAction.type === 'DELETE_STOCK') {
          setStocks(prev => prev.filter(s => s.id !== securityAction.payload));
          if (user?.uid && isOnline) {
-             await supabase.from('stock_items').delete().eq('id', securityAction.payload).eq('user_id', user.uid);
+             const { error } = await supabase.from('stock_items').delete().eq('id', securityAction.payload).eq('user_id', user.uid);
+             if (error) alert(`நீக்குதல் தோல்வி (Delete Failed): ${error.message}`);
          }
      } else if (securityAction.type === 'CLEAR_TXNS') {
          setTransactions([]);
          if (user?.uid && isOnline) {
-             await supabase.from('transactions').delete().eq('user_id', user.uid);
+             const { error } = await supabase.from('transactions').delete().eq('user_id', user.uid);
+             if (error) alert(`நீக்குதல் தோல்வி (Delete Failed): ${error.message}`);
          }
      } else if (securityAction.type === 'RESET_APP') {
          setStocks([]);
          setTransactions([]);
          if (user?.uid && isOnline) {
-             await supabase.from('stock_items').delete().eq('user_id', user.uid);
-             await supabase.from('transactions').delete().eq('user_id', user.uid);
+             const { error: sErr } = await supabase.from('stock_items').delete().eq('user_id', user.uid);
+             const { error: tErr } = await supabase.from('transactions').delete().eq('user_id', user.uid);
+             if (sErr || tErr) alert("Reset Failed on Server. Check internet.");
          }
      }
      
@@ -919,11 +932,15 @@ const App: React.FC = () => {
 
     // Persist to Supabase
     if (user?.uid && isOnline) {
-        await supabase.from('transactions').upsert({
+        const { error } = await supabase.from('transactions').upsert({
             id: newTxn.id,
             user_id: user.uid,
             content: newTxn
         });
+        if (error) {
+            console.error("Sync Error:", error);
+            alert(`ஆன்லைன் சேமிப்பு தோல்வி (Online Save Failed): ${error.message}. தயவுசெய்து Supabase SQL Tables உருவாக்கப்பட்டதா என சரிபார்க்கவும்.`);
+        }
     }
 
     // Update Local Cache
