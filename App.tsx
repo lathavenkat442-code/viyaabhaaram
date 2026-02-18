@@ -613,22 +613,16 @@ const App: React.FC = () => {
   const [showInstallBanner, setShowInstallBanner] = useState(false);
 
   useEffect(() => {
-    // FIX: Cast event listener to 'any' to bypass TS error for non-standard PWA event 'beforeinstallprompt'
-    const handleBeforeInstallPrompt = (e: any) => {
+    window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
       setShowInstallBanner(true);
-    };
+    });
 
-    window.addEventListener('beforeinstallprompt' as any, handleBeforeInstallPrompt);
-
-    // FIX: Cast event listener for 'appinstalled'
-    const handleAppInstalled = () => {
+    window.addEventListener('appinstalled', () => {
       setShowInstallBanner(false);
       setDeferredPrompt(null);
-    };
-
-    window.addEventListener('appinstalled' as any, handleAppInstalled);
+    });
     
     // Online/Offline Listeners
     window.addEventListener('online', () => setIsOnline(true));
@@ -671,11 +665,7 @@ const App: React.FC = () => {
         }
     });
 
-    return () => {
-        window.removeEventListener('beforeinstallprompt' as any, handleBeforeInstallPrompt);
-        window.removeEventListener('appinstalled' as any, handleAppInstalled);
-        subscription.unsubscribe();
-    }
+    return () => subscription.unsubscribe();
   }, []);
 
   const handleInstallClick = async () => {
@@ -688,7 +678,6 @@ const App: React.FC = () => {
     setDeferredPrompt(null);
   };
 
-  // ... [Rest of the file remains unchanged, just ensuring PWA event listeners are safely cast]
   // --- DATA SYNC (Supabase) ---
   const fetchData = useCallback(async (isManualRefresh = false) => {
       if (!user) return;
@@ -708,6 +697,12 @@ const App: React.FC = () => {
                   console.error("Supabase Error (Stock):", stockError.message);
                   if (isManualRefresh) alert(`Sync Error: ${stockError.message}. Check SQL Tables.`);
               } else if (stockData) {
+                  // If we have local stocks but server returns empty array, it might mean 
+                  // tables were just created or data was lost. 
+                  // Don't overwrite local if server is empty unless we are sure.
+                  // Current Logic: Server is truth. 
+                  // Improvement: If server is empty and local has data, offer to 'Push'.
+                  
                   const parsedStocks = stockData.map((row: any) => row.content);
                   parsedStocks.sort((a: StockItem, b: StockItem) => b.lastUpdated - a.lastUpdated);
                   setStocks(parsedStocks);

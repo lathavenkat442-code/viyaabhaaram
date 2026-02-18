@@ -5,9 +5,6 @@ import { TRANSLATIONS } from '../constants';
 import { TrendingUp, TrendingDown, Package, Sparkles, Lightbulb } from 'lucide-react';
 import { getBusinessInsights } from '../services/geminiService';
 
-// Fix for TS compile error on process.env
-declare var process: any;
-
 const Dashboard: React.FC<{ stocks: StockItem[]; transactions: Transaction[]; language: 'ta' | 'en' }> = ({ stocks, transactions, language }) => {
   const [tips, setTips] = useState<string[]>([]);
   const [loadingTips, setLoadingTips] = useState(false);

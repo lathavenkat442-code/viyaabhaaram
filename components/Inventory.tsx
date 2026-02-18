@@ -1,6 +1,7 @@
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { StockItem, StockVariant } from '../types';
-import { Search, Filter, Edit2, Package, AlertTriangle, Share2, ChevronLeft, History, Trash2 } from 'lucide-react';
+import { Search, Trash2, Filter, Edit2, Package, AlertTriangle, Share2, X, ChevronLeft, ChevronRight, Info, History } from 'lucide-react';
 import { TRANSLATIONS } from '../constants';
 
 const getTamilHistoryDescription = (desc: string) => {
@@ -275,7 +276,7 @@ const InventoryCard: React.FC<{ item: StockItem; onClick: () => void; onDelete: 
                 <div 
                     ref={scrollRef}
                     className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide h-full w-full"
-                    onClick={(e) => e.stopPropagation()} 
+                    onClick={(e) => e.stopPropagation()} // Allow swipe without triggering card click immediately if needed, though usually card click is fine.
                 >
                     {variants.length > 0 ? (
                         variants.map((v, idx) => (
@@ -283,7 +284,7 @@ const InventoryCard: React.FC<{ item: StockItem; onClick: () => void; onDelete: 
                                 key={v.id || idx} 
                                 data-index={idx}
                                 className="flex-shrink-0 w-full h-full snap-center flex items-center justify-center p-2 relative"
-                                onClick={onClick} 
+                                onClick={onClick} // Ensure clicking image opens modal
                             >
                                 {v.imageUrl ? (
                                     <img src={v.imageUrl} alt={`${item.name} ${idx}`} className="w-full h-full object-contain rounded-xl" />
@@ -395,8 +396,10 @@ const Inventory: React.FC<{ stocks: StockItem[]; onDelete: (id: string) => void;
     try {
       const totalQty = item.variants.reduce((acc, v) => acc + v.sizeStocks.reduce((s, ss) => s + ss.quantity, 0), 0);
       
+      // Construct detailed text with ALL variants
       let detailsText = "";
       item.variants.forEach((v, idx) => {
+          // Enhaced text for sharing colors/sleeves
           const stocksText = v.sizeStocks.map(ss => {
               if (ss.color) return `${ss.color} ${ss.sleeve ? '('+ss.sleeve+')' : ''} ${ss.size && ss.size !== 'General' ? '['+ss.size+']' : ''}: ${ss.quantity}`;
               return `${ss.size}: ${ss.quantity}`;
@@ -413,15 +416,18 @@ const Inventory: React.FC<{ stocks: StockItem[]; onDelete: (id: string) => void;
         text: text,
       };
 
+      // Collect ALL images
       const files: File[] = [];
       const validVariants = item.variants.filter(v => v.imageUrl && v.imageUrl.startsWith('data:'));
 
+      // Process images (Limit to 10 to avoid browser crash/limit issues)
       const maxImages = Math.min(validVariants.length, 10);
       
       for (let i = 0; i < maxImages; i++) {
           try {
               const res = await fetch(validVariants[i].imageUrl);
               const blob = await res.blob();
+              // Clean filename
               const filename = `${item.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${i+1}.png`;
               files.push(new File([blob], filename, { type: blob.type }));
           } catch (e) {
@@ -429,15 +435,12 @@ const Inventory: React.FC<{ stocks: StockItem[]; onDelete: (id: string) => void;
           }
       }
 
-      // Check if navigator.share and navigator.canShare are supported (with TS casts)
-      const nav = navigator as any;
-
-      if (files.length > 0 && nav.canShare && nav.canShare({ files })) {
+      if (files.length > 0 && navigator.canShare && navigator.canShare({ files })) {
         shareData.files = files;
       }
 
-      if (nav.share) {
-        await nav.share(shareData);
+      if (navigator.share) {
+        await navigator.share(shareData);
       } else {
         alert(language === 'ta' ? 'ஷேர் செய்யும் வசதி உங்கள் மொபைலில் இல்லை.' : 'Sharing not supported on this device.');
       }

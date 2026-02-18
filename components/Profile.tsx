@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { User, StockItem, Transaction, BackupFrequency } from '../types';
-import { LogOut, ShieldCheck, Download, FileSpreadsheet, HardDriveDownload, Globe, CheckCircle2, UploadCloud, Save, Cloud, Calendar, History, Settings, ToggleLeft, ToggleRight, Image, X, AlertTriangle, Eraser, Trash2, ChevronDown } from 'lucide-react';
+import { LogOut, ShieldCheck, Download, FileSpreadsheet, HardDriveDownload, Globe, CheckCircle2, UploadCloud, Save, Cloud, Calendar, History, Settings, ToggleLeft, ToggleRight, Image, User as UserIcon, X, AlertTriangle, Eraser, Trash2, ChevronDown } from 'lucide-react';
 
 interface ProfileProps {
   user: User;

@@ -2,7 +2,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { StockItem, Transaction } from "../types";
 
-// TS Fix for process.env usage
+// Declare process to satisfy TypeScript
 declare var process: any;
 
 const FALLBACK_TIPS = [
@@ -29,35 +29,48 @@ const getRandomTips = (count: number) => {
 };
 
 export const getBusinessInsights = async (stocks: StockItem[], transactions: Transaction[]) => {
+  // Safe check for API Key
+  let apiKey = '';
   try {
-    // Guidelines: API Key must be obtained exclusively from process.env.API_KEY
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+      apiKey = process.env.API_KEY;
+    }
+  } catch (e) {
+    // Ignore error if process is undefined
+  }
+
+  // Return fallbacks if no API key
+  if (!apiKey) {
+     return getRandomTips(3);
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
   
-    // Optimize payload: Convert to simple strings to avoid complex JSON nesting issues and reduce token count
-    const stockSummary = stocks.slice(0, 10).map(s => { 
-      const qty = s.variants 
-        ? s.variants.reduce((acc, v) => acc + v.sizeStocks.reduce((sum, ss) => sum + ss.quantity, 0), 0)
-        : 0;
-      return `${s.name}: ${qty}`;
-    }).join(', ');
+  // Optimize payload: Convert to simple strings to avoid complex JSON nesting issues and reduce token count
+  const stockSummary = stocks.slice(0, 10).map(s => { 
+    const qty = s.variants 
+      ? s.variants.reduce((acc, v) => acc + v.sizeStocks.reduce((sum, ss) => sum + ss.quantity, 0), 0)
+      : 0;
+    return `${s.name}: ${qty}`;
+  }).join(', ');
+  
+  const txnSummary = transactions.slice(-10).map(t => 
+    `${t.type} ${t.amount} for ${t.category}`
+  ).join(', ');
+
+  // Simplified Prompt
+  const prompt = `
+    As a business analyst, provide 3 short, actionable tips in Tamil based on this data.
+    Stocks: [${stockSummary}]
+    Transactions: [${txnSummary}]
     
-    const txnSummary = transactions.slice(-10).map(t => 
-      `${t.type} ${t.amount} for ${t.category}`
-    ).join(', ');
+    Focus on inventory management and cash flow.
+  `;
 
-    // Simplified Prompt
-    const prompt = `
-      As a business analyst, provide 3 short, actionable tips in Tamil based on this data.
-      Stocks: [${stockSummary}]
-      Transactions: [${txnSummary}]
-      
-      Focus on inventory management and cash flow.
-    `;
-
-    // Guidelines: Use 'contents' as a simple string for text prompts
+  try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: prompt,
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: {
         responseMimeType: 'application/json',
         responseSchema: {
