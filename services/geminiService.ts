@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { StockItem, Transaction } from "../types";
 
@@ -29,22 +28,12 @@ const getRandomTips = (count: number) => {
 };
 
 export const getBusinessInsights = async (stocks: StockItem[], transactions: Transaction[]) => {
-  // Safe check for API Key
-  let apiKey = '';
-  try {
-    if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
-      apiKey = process.env.API_KEY;
-    }
-  } catch (e) {
-    // Ignore error if process is undefined
-  }
-
-  // Return fallbacks if no API key
-  if (!apiKey) {
+  // Use API Key from process.env directly as per guidelines
+  if (!process?.env?.API_KEY) {
      return getRandomTips(3);
   }
 
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   // Optimize payload: Convert to simple strings to avoid complex JSON nesting issues and reduce token count
   const stockSummary = stocks.slice(0, 10).map(s => { 

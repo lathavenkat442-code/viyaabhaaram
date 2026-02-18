@@ -6,7 +6,7 @@ import Dashboard from './components/Dashboard';
 import Inventory from './components/Inventory';
 import Accounting from './components/Accounting';
 import Profile from './components/Profile';
-import { supabase, isSupabaseConfigured, saveSupabaseConfig } from './supabaseClient'; // Import updated client helpers
+import { supabase, isSupabaseConfigured, saveSupabaseConfig } from './supabaseClient';
 import { 
   LayoutDashboard, 
   Package, 
@@ -613,13 +613,14 @@ const App: React.FC = () => {
   const [showInstallBanner, setShowInstallBanner] = useState(false);
 
   useEffect(() => {
-    window.addEventListener('beforeinstallprompt', (e) => {
+    // FIX: Explicitly typing event as any to avoid window type errors during build
+    window.addEventListener('beforeinstallprompt' as any, (e: any) => {
       e.preventDefault();
       setDeferredPrompt(e);
       setShowInstallBanner(true);
     });
 
-    window.addEventListener('appinstalled', () => {
+    window.addEventListener('appinstalled' as any, () => {
       setShowInstallBanner(false);
       setDeferredPrompt(null);
     });
@@ -697,12 +698,6 @@ const App: React.FC = () => {
                   console.error("Supabase Error (Stock):", stockError.message);
                   if (isManualRefresh) alert(`Sync Error: ${stockError.message}. Check SQL Tables.`);
               } else if (stockData) {
-                  // If we have local stocks but server returns empty array, it might mean 
-                  // tables were just created or data was lost. 
-                  // Don't overwrite local if server is empty unless we are sure.
-                  // Current Logic: Server is truth. 
-                  // Improvement: If server is empty and local has data, offer to 'Push'.
-                  
                   const parsedStocks = stockData.map((row: any) => row.content);
                   parsedStocks.sort((a: StockItem, b: StockItem) => b.lastUpdated - a.lastUpdated);
                   setStocks(parsedStocks);
@@ -839,7 +834,7 @@ const App: React.FC = () => {
             id: newItem.id,
             user_id: user.uid,
             content: newItem,
-            last_updated: newItem.lastUpdated // Ensure this column exists in DB or ignore
+            last_updated: newItem.lastUpdated
         });
         if (error) {
             console.error("Sync Error:", error);
@@ -1165,9 +1160,8 @@ const App: React.FC = () => {
   );
 };
 
-// ... [Keep SecurityOtpModal and AuthScreen exactly as they were, no changes needed inside them for this fix] ...
+// ... [SecurityOtpModal and AuthScreen components remain unchanged] ...
 const SecurityOtpModal: React.FC<{ otp: string; actionType: SecurityActionType; onVerify: () => void; onCancel: () => void; language: 'ta' | 'en'; t: any }> = ({ otp, actionType, onVerify, onCancel, language, t }) => {
-    // ... [Content of SecurityOtpModal] ...
     const [input, setInput] = useState('');
     const [error, setError] = useState(false);
 
@@ -1242,7 +1236,6 @@ const SecurityOtpModal: React.FC<{ otp: string; actionType: SecurityActionType; 
     );
 };
 
-// --- AUTH SCREEN (UPDATED for Supabase) ---
 const AuthScreen: React.FC<{ onLogin: (u: User) => void; onRestore: (d: any) => void; language: 'ta' | 'en'; t: any; isOnline: boolean }> = ({ onLogin, onRestore, language, t, isOnline }) => {
     const [mode, setMode] = useState<'LOGIN' | 'REGISTER' | 'FORGOT_PASSWORD'>('LOGIN');
     const [email, setEmail] = useState('');
