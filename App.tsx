@@ -1374,8 +1374,12 @@ const AuthScreen: React.FC<{ onLogin: (u: User) => void; onRestore: (d: any) => 
                 <div className="bg-white w-full max-w-sm rounded-[2rem] p-8 text-gray-800 shadow-2xl">
                     <div className="text-center mb-6">
                         <Database size={48} className="mx-auto text-indigo-600 mb-2"/>
-                        <h2 className="text-xl font-black text-gray-800">Setup Cloud Database</h2>
-                        <p className="text-xs text-gray-500">Enter Supabase Credentials to enable online sync.</p>
+                        <h2 className="text-xl font-black text-gray-800 tamil-font">
+                            {language === 'ta' ? 'கிளவுட் டேட்டாபேஸ் செட்டிங்ஸ்' : 'Setup Cloud Database'}
+                        </h2>
+                        <p className="text-xs text-gray-500 tamil-font">
+                            {language === 'ta' ? 'ஆன்லைன் சிங்க் வசதியை பெற Supabase விவரங்களை உள்ளிடவும்.' : 'Enter Supabase Credentials to enable online sync.'}
+                        </p>
                     </div>
                     
                     <form onSubmit={handleSaveConfig} className="space-y-4">
@@ -1400,13 +1404,13 @@ const AuthScreen: React.FC<{ onLogin: (u: User) => void; onRestore: (d: any) => 
                             />
                         </div>
                         
-                        <button className="w-full bg-indigo-600 text-white p-3 rounded-xl font-bold shadow-lg hover:bg-indigo-700">
-                            Save & Connect
+                        <button className="w-full bg-indigo-600 text-white p-3 rounded-xl font-bold shadow-lg hover:bg-indigo-700 tamil-font">
+                            {language === 'ta' ? 'சேமித்து இணைக்க' : 'Save & Connect'}
                         </button>
                     </form>
                     
-                    <button onClick={() => setShowSetup(false)} className="w-full mt-4 text-gray-400 text-xs hover:text-gray-600">
-                        Skip / Back to Guest Mode
+                    <button onClick={() => setShowSetup(false)} className="w-full mt-4 text-gray-400 text-xs hover:text-gray-600 tamil-font">
+                        {language === 'ta' ? 'தவிர் / விருந்தினர் முறைக்கு திரும்ப' : 'Skip / Back to Guest Mode'}
                     </button>
                 </div>
             </div>
@@ -1422,7 +1426,7 @@ const AuthScreen: React.FC<{ onLogin: (u: User) => void; onRestore: (d: any) => 
               { !isSupabaseConfigured && (
                   <div className="bg-amber-50 text-amber-700 p-3 rounded-xl mb-4 text-xs font-bold text-center border border-amber-100 flex items-center justify-center gap-2 cursor-pointer hover:bg-amber-100" onClick={() => setShowSetup(true)}>
                     <WifiOff size={16} />
-                    <span>Click to Setup Online Database</span>
+                    <span className="tamil-font">{language === 'ta' ? 'ஆன்லைன் டேட்டாபேஸ் அமைக்க இங்கே கிளிக் செய்யவும்' : 'Click to Setup Online Database'}</span>
                   </div>
               )}
 
@@ -1530,7 +1534,8 @@ const AuthScreen: React.FC<{ onLogin: (u: User) => void; onRestore: (d: any) => 
                         </div>
                         <div className="mt-2 text-center">
                             <button onClick={() => setShowSetup(true)} className="text-[10px] text-gray-300 hover:text-indigo-500 font-bold uppercase tracking-widest transition">
-                                <Settings size={12} className="inline mr-1" /> Configure Database
+                                <Settings size={12} className="inline mr-1" /> 
+                                {language === 'ta' ? 'டேட்டாபேஸ் அமைக்க (Database Setup)' : 'Configure Database'}
                             </button>
                         </div>
                     </>

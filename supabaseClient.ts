@@ -16,25 +16,50 @@ const envKey = env.VITE_SUPABASE_ANON_KEY;
 const localUrl = localStorage.getItem('viyabaari_supabase_url');
 const localKey = localStorage.getItem('viyabaari_supabase_key');
 
-const supabaseUrl = envUrl || localUrl;
-const supabaseAnonKey = envKey || localKey;
+let rawUrl = envUrl || localUrl;
+const rawKey = envKey || localKey;
 
-export const isSupabaseConfigured = !!(supabaseUrl && supabaseAnonKey && supabaseUrl !== 'undefined' && supabaseAnonKey !== 'undefined');
+// Validation Helper
+const isValidUrl = (url: string | null | undefined) => {
+  if (!url) return false;
+  try {
+     return url.startsWith('http://') || url.startsWith('https://');
+  } catch (e) {
+     return false;
+  }
+};
 
-if (!isSupabaseConfigured) {
-  console.warn("Viyabaari: Supabase credentials missing. Online features will disabled until configured.");
+// Attempt to fix common URL issues (missing protocol) for the check
+if (rawUrl && !rawUrl.startsWith('http') && rawUrl.includes('.')) {
+    rawUrl = `https://${rawUrl}`;
 }
 
-// Initialize the client directly.
-export const supabase = createClient(
-  supabaseUrl || 'https://placeholder.supabase.co', 
-  supabaseAnonKey || 'placeholder'
-);
+const isConfigValid = isValidUrl(rawUrl) && rawKey && rawKey !== 'undefined';
 
-// Helper to save config from UI
+export const isSupabaseConfigured = !!isConfigValid;
+
+if (!isSupabaseConfigured) {
+  console.warn("Viyabaari: Supabase credentials missing or invalid. Online features will be disabled.");
+}
+
+// Initialize the client safely. 
+// If URL is invalid, use a valid placeholder so the app doesn't crash on boot.
+const safeUrl = isConfigValid ? rawUrl : 'https://placeholder.supabase.co';
+const safeKey = isConfigValid ? rawKey : 'placeholder';
+
+export const supabase = createClient(safeUrl, safeKey);
+
+// Helper to save config from UI with sanitization
 export const saveSupabaseConfig = (url: string, key: string) => {
     if (!url || !key) return;
-    localStorage.setItem('viyabaari_supabase_url', url.trim());
+    
+    let cleanUrl = url.trim();
+    // Auto-append https if missing
+    if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
+        cleanUrl = `https://${cleanUrl}`;
+    }
+
+    localStorage.setItem('viyabaari_supabase_url', cleanUrl);
     localStorage.setItem('viyabaari_supabase_key', key.trim());
     window.location.reload();
 };
