@@ -1,3 +1,4 @@
+
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
@@ -10,8 +11,8 @@ if (!rootElement) {
 // Service Worker Registration for Android Installation
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    // Attempt to register service worker, but handle preview environment errors gracefully
-    navigator.serviceWorker.register('/sw.js')
+    // Attempt to register service worker with a relative path
+    navigator.serviceWorker.register('./sw.js')
       .then(reg => console.log('Service worker registered!', reg))
       .catch(err => {
         // Suppress specific origin errors common in preview environments

@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'viyabaari-v8-stable';
+const CACHE_NAME = 'viyabaari-v9-stable';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -21,6 +21,7 @@ self.addEventListener('install', (event) => {
         // Critical: These MUST succeed for SW to install
         return cache.addAll(CORE_ASSETS)
           .then(() => {
+             // Optional: Try to cache these but don't fail installation
              const optionalCaching = OPTIONAL_ASSETS.map(url => {
                 return fetch(url).then(res => {
                     if(res.ok) cache.put(url, res);
@@ -51,20 +52,25 @@ self.addEventListener('activate', (event) => {
 
 // Fetch event - Network first, then Cache
 self.addEventListener('fetch', (event) => {
+  // Only handle GET requests
   if (event.request.method !== 'GET') return;
+  // Skip chrome-extension or other schemes
   if (!event.request.url.startsWith('http')) return;
 
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
+        // Return cached response immediately
         return cachedResponse;
       }
 
       return fetch(event.request).then((networkResponse) => {
+        // Check for valid response
         if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic' && networkResponse.type !== 'cors') {
           return networkResponse;
         }
 
+        // Cache the valid response
         const responseToCache = networkResponse.clone();
         caches.open(CACHE_NAME).then((cache) => {
           cache.put(event.request, responseToCache);
@@ -72,7 +78,7 @@ self.addEventListener('fetch', (event) => {
 
         return networkResponse;
       }).catch(() => {
-        // Fallback to index.html for navigation requests
+        // Fallback to index.html for navigation requests (SPA support)
         if (event.request.mode === 'navigate') {
           return caches.match('./index.html').then(response => {
               return response || caches.match('./');
