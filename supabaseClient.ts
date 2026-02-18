@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 
 // INSTRUCTIONS FOR SUPABASE SETUP:
@@ -13,8 +12,9 @@ const envUrl = env.VITE_SUPABASE_URL;
 const envKey = env.VITE_SUPABASE_ANON_KEY;
 
 // Fallback: Check LocalStorage (allows users to input keys in UI if .env is missing)
-const localUrl = localStorage.getItem('viyabaari_supabase_url');
-const localKey = localStorage.getItem('viyabaari_supabase_key');
+// Safe check for window to prevent build errors
+const localUrl = typeof window !== 'undefined' ? localStorage.getItem('viyabaari_supabase_url') : null;
+const localKey = typeof window !== 'undefined' ? localStorage.getItem('viyabaari_supabase_key') : null;
 
 let rawUrl = envUrl || localUrl;
 const rawKey = envKey || localKey;

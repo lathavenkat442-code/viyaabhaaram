@@ -2,6 +2,9 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { StockItem, Transaction } from "../types";
 
+// TS Fix for process.env usage
+declare var process: any;
+
 const FALLBACK_TIPS = [
   "அதிகம் விற்பனையாகும் பொருட்களைக் கண்டறிந்து இருப்பு வைக்கவும்.",
   "தேவையற்ற செலவுகளைக் குறைத்து லாபத்தை அதிகரிக்கவும்.",
