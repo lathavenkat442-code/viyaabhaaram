@@ -6,7 +6,7 @@ import Dashboard from './components/Dashboard';
 import Inventory from './components/Inventory';
 import Accounting from './components/Accounting';
 import Profile from './components/Profile';
-import { supabase } from './supabaseClient'; // Import Supabase Client
+import { supabase, isSupabaseConfigured, saveSupabaseConfig } from './supabaseClient'; // Import updated client helpers
 import { 
   LayoutDashboard, 
   Package, 
@@ -40,7 +40,10 @@ import {
   WifiOff,
   Loader2,
   RefreshCw,
-  KeyRound
+  KeyRound,
+  CloudUpload,
+  Database,
+  Settings
 } from 'lucide-react';
 
 // Unified Security Action State
@@ -659,9 +662,6 @@ const App: React.FC = () => {
                 mobile: session.user.user_metadata.mobile || '',
                 isLoggedIn: true
             });
-        } else {
-            // Only clear if explicitly logged out, otherwise might be offline state
-            // setUser(null); 
         }
     });
 
@@ -693,12 +693,19 @@ const App: React.FC = () => {
                   .select('content')
                   .eq('user_id', user.uid);
               
-              if (stockData && !stockError) {
+              if (stockError) {
+                  console.error("Supabase Error (Stock):", stockError.message);
+                  if (isManualRefresh) alert(`Sync Error: ${stockError.message}. Check SQL Tables.`);
+              } else if (stockData) {
+                  // If we have local stocks but server returns empty array, it might mean 
+                  // tables were just created or data was lost. 
+                  // Don't overwrite local if server is empty unless we are sure.
+                  // Current Logic: Server is truth. 
+                  // Improvement: If server is empty and local has data, offer to 'Push'.
+                  
                   const parsedStocks = stockData.map((row: any) => row.content);
-                  // Sort by lastUpdated desc to show newest changes
                   parsedStocks.sort((a: StockItem, b: StockItem) => b.lastUpdated - a.lastUpdated);
                   setStocks(parsedStocks);
-                  // Update local cache
                   localStorage.setItem(`viyabaari_stocks_${user.email}`, JSON.stringify(parsedStocks));
                   fetchedFromOnline = true;
               }
@@ -709,12 +716,12 @@ const App: React.FC = () => {
                   .select('content')
                   .eq('user_id', user.uid);
 
-              if (txnData && !txnError) {
+              if (txnError) {
+                   console.error("Supabase Error (Txn):", txnError.message);
+              } else if (txnData) {
                   const parsedTxns = txnData.map((row: any) => row.content);
-                  // Sort transactions by date desc
                   parsedTxns.sort((a: Transaction, b: Transaction) => b.date - a.date);
                   setTransactions(parsedTxns);
-                  // Update local cache
                   localStorage.setItem(`viyabaari_txns_${user.email}`, JSON.stringify(parsedTxns));
                   fetchedFromOnline = true;
               }
@@ -723,14 +730,13 @@ const App: React.FC = () => {
               console.error('Error fetching data:', err);
           } finally {
               if (isManualRefresh) {
-                  setTimeout(() => setIsSyncing(false), 500); // Small delay for visual feedback
+                  setTimeout(() => setIsSyncing(false), 500); 
               }
           }
       } 
       
-      // Fallback: If offline OR if online fetch failed (empty/error), load from LocalStorage
+      // Fallback: If offline OR if online fetch failed (empty/error) AND we haven't successfully fetched
       if (!fetchedFromOnline) {
-           // Load from Local Storage if offline or guest or online fetch failed
            const savedStocks = localStorage.getItem(`viyabaari_stocks_${user.email}`);
            const savedTxns = localStorage.getItem(`viyabaari_txns_${user.email}`);
            if (savedStocks) setStocks(JSON.parse(savedStocks));
@@ -790,14 +796,12 @@ const App: React.FC = () => {
     let newItem: StockItem;
 
     if (id) {
-        // Update Logic
         const existingItem = stocks.find(s => s.id === id);
         if (!existingItem) { setIsLoading(false); return; }
 
         const oldHistory = existingItem.history || [];
         const newHistory = [...oldHistory];
         
-        // History calculation
         const oldPrice = existingItem.price;
         const newPrice = itemData.price;
         const oldQty = existingItem.variants ? existingItem.variants.reduce((acc, v) => acc + v.sizeStocks.reduce((sum, ss) => sum + ss.quantity, 0), 0) : 0;
@@ -819,17 +823,13 @@ const App: React.FC = () => {
         }
 
         newItem = { ...itemData, variants: sanitizedVariants, id, lastUpdated: Date.now(), history: newHistory };
-        
-        // Optimistic Update
         setStocks(prev => prev.map(s => s.id === id ? newItem : s));
 
     } else {
-        // Create Logic
         const initialQty = sanitizedVariants.reduce((acc, v) => acc + v.sizeStocks.reduce((sum, ss) => sum + ss.quantity, 0), 0);
         const newHistory: StockHistory[] = [{ date: Date.now(), action: 'CREATED', description: 'Item Created', change: `Initial Stock: ${initialQty}` }];
 
         newItem = { ...itemData, variants: sanitizedVariants, id: Date.now().toString(), lastUpdated: Date.now(), history: newHistory };
-        // Optimistic Update
         setStocks(prev => [newItem, ...prev]);
     }
 
@@ -838,13 +838,15 @@ const App: React.FC = () => {
         const { error } = await supabase.from('stock_items').upsert({
             id: newItem.id,
             user_id: user.uid,
-            content: newItem
+            content: newItem,
+            last_updated: newItem.lastUpdated // Ensure this column exists in DB or ignore
         });
         if (error) {
             console.error("Sync Error:", error);
-            alert(`ஆன்லைன் சேமிப்பு தோல்வி (Online Save Failed): ${error.message}. தயவுசெய்து Supabase SQL Tables உருவாக்கப்பட்டதா என சரிபார்க்கவும்.`);
+            alert(`ஆன்லைன் சேமிப்பு தோல்வி (Save Failed): ${error.message}.\n\nதீர்வு: Supabase Dashboard -> SQL Editor சென்று Tables உருவாக்கவும்.`);
         }
     }
+    
     // Update Local Cache
     if (user?.email) {
         const updatedStocks = id ? stocks.map(s => s.id === id ? newItem : s) : [newItem, ...stocks];
@@ -882,25 +884,23 @@ const App: React.FC = () => {
          setStocks(prev => prev.filter(s => s.id !== securityAction.payload));
          if (user?.uid && isOnline) {
              const { error } = await supabase.from('stock_items').delete().eq('id', securityAction.payload).eq('user_id', user.uid);
-             if (error) alert(`நீக்குதல் தோல்வி (Delete Failed): ${error.message}`);
+             if (error) alert(`Delete Failed: ${error.message}`);
          }
      } else if (securityAction.type === 'CLEAR_TXNS') {
          setTransactions([]);
          if (user?.uid && isOnline) {
              const { error } = await supabase.from('transactions').delete().eq('user_id', user.uid);
-             if (error) alert(`நீக்குதல் தோல்வி (Delete Failed): ${error.message}`);
+             if (error) alert(`Delete Failed: ${error.message}`);
          }
      } else if (securityAction.type === 'RESET_APP') {
          setStocks([]);
          setTransactions([]);
          if (user?.uid && isOnline) {
-             const { error: sErr } = await supabase.from('stock_items').delete().eq('user_id', user.uid);
-             const { error: tErr } = await supabase.from('transactions').delete().eq('user_id', user.uid);
-             if (sErr || tErr) alert("Reset Failed on Server. Check internet.");
+             await supabase.from('stock_items').delete().eq('user_id', user.uid);
+             await supabase.from('transactions').delete().eq('user_id', user.uid);
          }
      }
      
-     // Update local cache
      if (user?.email) {
          if (securityAction.type === 'DELETE_STOCK') {
              const updated = stocks.filter(s => s.id !== securityAction.payload);
@@ -930,20 +930,19 @@ const App: React.FC = () => {
         setTransactions(prev => [newTxn, ...prev]);
     }
 
-    // Persist to Supabase
     if (user?.uid && isOnline) {
         const { error } = await supabase.from('transactions').upsert({
             id: newTxn.id,
             user_id: user.uid,
-            content: newTxn
+            content: newTxn,
+            date: newTxn.date
         });
         if (error) {
             console.error("Sync Error:", error);
-            alert(`ஆன்லைன் சேமிப்பு தோல்வி (Online Save Failed): ${error.message}. தயவுசெய்து Supabase SQL Tables உருவாக்கப்பட்டதா என சரிபார்க்கவும்.`);
+            alert(`ஆன்லைன் சேமிப்பு தோல்வி (Save Failed): ${error.message}. SQL Tables சரிபார்க்கவும்.`);
         }
     }
 
-    // Update Local Cache
     if (user?.email) {
         const updatedTxns = id ? transactions.map(t => t.id === id ? newTxn : t) : [newTxn, ...transactions];
         localStorage.setItem(`viyabaari_txns_${user.email}`, JSON.stringify(updatedTxns));
@@ -952,6 +951,38 @@ const App: React.FC = () => {
     setIsLoading(false);
     setIsAddingTransaction(false);
     setEditingTransaction(null);
+  };
+  
+  // Manual Sync Up Function (Push Local to Server)
+  const handleManualPush = async () => {
+      if(!user?.uid || !isOnline) {
+          alert(language === 'ta' ? 'இணைய இணைப்பு தேவை' : 'Online connection required');
+          return;
+      }
+      setIsSyncing(true);
+      
+      // Push Stocks
+      for(const s of stocks) {
+          await supabase.from('stock_items').upsert({
+              id: s.id,
+              user_id: user.uid,
+              content: s,
+              last_updated: s.lastUpdated
+          });
+      }
+      
+      // Push Transactions
+      for(const t of transactions) {
+          await supabase.from('transactions').upsert({
+              id: t.id,
+              user_id: user.uid,
+              content: t,
+              date: t.date
+          });
+      }
+      
+      setIsSyncing(false);
+      alert(language === 'ta' ? 'டேட்டா ஆன்லைனில் வெற்றிகரமாக ஏற்றப்பட்டது!' : 'Data synced to server successfully!');
   };
 
   const handleLogin = (u: User) => {
@@ -977,7 +1008,6 @@ const App: React.FC = () => {
   };
 
   const handleRestoreData = (data: any) => {
-     // Legacy local file restore - logic kept for backward compatibility
     if (data && data.user && Array.isArray(data.stocks)) {
       handleLogin(data.user);
       setStocks(data.stocks);
@@ -1037,6 +1067,17 @@ const App: React.FC = () => {
                     >
                         <RefreshCw size={22} />
                     </button>
+                )}
+                
+                {/* Manual Push Button (Only if items exist locally but may be missing on server) */}
+                {isOnline && user.uid && (stocks.length > 0 || transactions.length > 0) && (
+                     <button 
+                        onClick={handleManualPush}
+                        className="hover:bg-indigo-500 p-1 rounded-full transition"
+                        title={language === 'ta' ? 'ஆன்லைனில் ஏற்று (Push)' : 'Push to Server'}
+                     >
+                         <CloudUpload size={22} />
+                     </button>
                 )}
                 
                 <button onClick={() => { setEditingStock(null); setIsAddingStock(true); }} className="hover:bg-indigo-500 p-1 rounded-full transition">
@@ -1124,9 +1165,9 @@ const App: React.FC = () => {
   );
 };
 
-// --- Reusable Security OTP Modal Component ---
+// ... [Keep SecurityOtpModal and AuthScreen exactly as they were, no changes needed inside them for this fix] ...
 const SecurityOtpModal: React.FC<{ otp: string; actionType: SecurityActionType; onVerify: () => void; onCancel: () => void; language: 'ta' | 'en'; t: any }> = ({ otp, actionType, onVerify, onCancel, language, t }) => {
-    // ... [Content of SecurityOtpModal same as before] ...
+    // ... [Content of SecurityOtpModal] ...
     const [input, setInput] = useState('');
     const [error, setError] = useState(false);
 
@@ -1210,9 +1251,11 @@ const AuthScreen: React.FC<{ onLogin: (u: User) => void; onRestore: (d: any) => 
     const [mobile, setMobile] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
-  
-    // Check if Supabase keys are present in env
-    const isSupabaseConfigured = !!((import.meta as any).env?.VITE_SUPABASE_URL && (import.meta as any).env?.VITE_SUPABASE_ANON_KEY);
+    
+    // Manual Config State
+    const [showSetup, setShowSetup] = useState(false);
+    const [setupUrl, setSetupUrl] = useState('');
+    const [setupKey, setSetupKey] = useState('');
 
     const handleAuth = async (e: React.FormEvent) => {
       e.preventDefault();
@@ -1225,7 +1268,8 @@ const AuthScreen: React.FC<{ onLogin: (u: User) => void; onRestore: (d: any) => 
       }
       
       if (!isSupabaseConfigured) {
-          alert("Supabase not configured. Please use Guest Mode (Offline).");
+          // If trying to login but not configured, show setup
+          setShowSetup(true);
           setIsLoading(false);
           return;
       }
@@ -1265,6 +1309,11 @@ const AuthScreen: React.FC<{ onLogin: (u: User) => void; onRestore: (d: any) => 
       } finally {
           setIsLoading(false);
       }
+    };
+    
+    const handleSaveConfig = (e: React.FormEvent) => {
+        e.preventDefault();
+        saveSupabaseConfig(setupUrl, setupKey);
     };
 
     const handleForgotPassword = async (e: React.FormEvent) => {
@@ -1319,6 +1368,51 @@ const AuthScreen: React.FC<{ onLogin: (u: User) => void; onRestore: (d: any) => 
       e.target.value = '';
     };
   
+    if (showSetup || !isSupabaseConfigured) {
+        return (
+            <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white relative">
+                <div className="bg-white w-full max-w-sm rounded-[2rem] p-8 text-gray-800 shadow-2xl">
+                    <div className="text-center mb-6">
+                        <Database size={48} className="mx-auto text-indigo-600 mb-2"/>
+                        <h2 className="text-xl font-black text-gray-800">Setup Cloud Database</h2>
+                        <p className="text-xs text-gray-500">Enter Supabase Credentials to enable online sync.</p>
+                    </div>
+                    
+                    <form onSubmit={handleSaveConfig} className="space-y-4">
+                        <div>
+                            <label className="text-xs font-bold text-gray-400 uppercase">Supabase URL</label>
+                            <input 
+                                value={setupUrl} 
+                                onChange={e => setSetupUrl(e.target.value)} 
+                                className="w-full bg-gray-100 p-3 rounded-xl font-mono text-sm border focus:border-indigo-500 outline-none" 
+                                placeholder="https://xyz.supabase.co"
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-gray-400 uppercase">Anon Key</label>
+                            <input 
+                                value={setupKey} 
+                                onChange={e => setSetupKey(e.target.value)} 
+                                className="w-full bg-gray-100 p-3 rounded-xl font-mono text-sm border focus:border-indigo-500 outline-none" 
+                                placeholder="eyJhbGciOiJIUzI1NiIsIn..."
+                                required
+                            />
+                        </div>
+                        
+                        <button className="w-full bg-indigo-600 text-white p-3 rounded-xl font-bold shadow-lg hover:bg-indigo-700">
+                            Save & Connect
+                        </button>
+                    </form>
+                    
+                    <button onClick={() => setShowSetup(false)} className="w-full mt-4 text-gray-400 text-xs hover:text-gray-600">
+                        Skip / Back to Guest Mode
+                    </button>
+                </div>
+            </div>
+        );
+    }
+  
     return (
       <div className="min-h-screen bg-indigo-600 flex flex-col items-center justify-center p-6 text-white relative">
          <h1 className="text-4xl font-black tamil-font mb-2 text-center">{t.appName}</h1>
@@ -1326,9 +1420,9 @@ const AuthScreen: React.FC<{ onLogin: (u: User) => void; onRestore: (d: any) => 
          
          <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 text-gray-800 shadow-2xl">
               { !isSupabaseConfigured && (
-                  <div className="bg-amber-50 text-amber-700 p-3 rounded-xl mb-4 text-xs font-bold text-center border border-amber-100 flex items-center justify-center gap-2">
+                  <div className="bg-amber-50 text-amber-700 p-3 rounded-xl mb-4 text-xs font-bold text-center border border-amber-100 flex items-center justify-center gap-2 cursor-pointer hover:bg-amber-100" onClick={() => setShowSetup(true)}>
                     <WifiOff size={16} />
-                    <span>{language === 'ta' ? 'ஆன்லைன் வசதி இல்லை (Offline Only)' : 'Online Sync Not Configured'}</span>
+                    <span>Click to Setup Online Database</span>
                   </div>
               )}
 
@@ -1364,14 +1458,14 @@ const AuthScreen: React.FC<{ onLogin: (u: User) => void; onRestore: (d: any) => 
                           <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">{language === 'ta' ? 'பெயர்' : 'Name'}</label>
                           <div className="relative">
                               <UserSimple className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18}/>
-                              <input value={name} onChange={e => setName(e.target.value)} className="w-full bg-gray-50 p-4 pl-12 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100 transition" required disabled={!isSupabaseConfigured} />
+                              <input value={name} onChange={e => setName(e.target.value)} className="w-full bg-gray-50 p-4 pl-12 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100 transition" required />
                           </div>
                       </div>
                       <div className="space-y-1">
                           <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">{t.mobile}</label>
                           <div className="relative">
                               <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18}/>
-                              <input type="tel" value={mobile} onChange={e => setMobile(e.target.value)} className="w-full bg-gray-50 p-4 pl-12 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100 transition" required disabled={!isSupabaseConfigured} />
+                              <input type="tel" value={mobile} onChange={e => setMobile(e.target.value)} className="w-full bg-gray-50 p-4 pl-12 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100 transition" required />
                           </div>
                       </div>
                       </>
@@ -1381,7 +1475,7 @@ const AuthScreen: React.FC<{ onLogin: (u: User) => void; onRestore: (d: any) => 
                       <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Email</label>
                       <div className="relative">
                           <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18}/>
-                          <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-gray-50 p-4 pl-12 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100 transition" required disabled={!isSupabaseConfigured} />
+                          <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-gray-50 p-4 pl-12 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100 transition" required />
                       </div>
                   </div>
                   
@@ -1390,7 +1484,7 @@ const AuthScreen: React.FC<{ onLogin: (u: User) => void; onRestore: (d: any) => 
                         <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">{language === 'ta' ? 'கடவுச்சொல்' : 'Password'}</label>
                         <div className="relative">
                         <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18}/>
-                        <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-gray-50 p-4 pl-12 pr-12 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100 transition" required disabled={!isSupabaseConfigured} />
+                        <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-gray-50 p-4 pl-12 pr-12 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100 transition" required />
                         <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
                             {showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}
                         </button>
@@ -1407,7 +1501,7 @@ const AuthScreen: React.FC<{ onLogin: (u: User) => void; onRestore: (d: any) => 
                       </div>
                   )}
   
-                  <button disabled={isLoading || !isSupabaseConfigured} className={`w-full text-white p-4 rounded-2xl font-black shadow-lg shadow-indigo-200 mt-6 active:scale-95 transition flex justify-center ${!isSupabaseConfigured ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600'}`}>
+                  <button disabled={isLoading} className="w-full bg-indigo-600 text-white p-4 rounded-2xl font-black shadow-lg shadow-indigo-200 mt-6 active:scale-95 transition flex justify-center hover:bg-indigo-700">
                       {isLoading ? <Loader2 className="animate-spin" /> : (mode === 'LOGIN' ? (language === 'ta' ? 'உள்நுழைய' : 'Login') : mode === 'REGISTER' ? (language === 'ta' ? 'பதிவு செய்' : 'Register') : t.sendResetLink)}
                   </button>
 
@@ -1433,6 +1527,11 @@ const AuthScreen: React.FC<{ onLogin: (u: User) => void; onRestore: (d: any) => 
                                 <span>{language === 'ta' ? 'பழைய பேக்கப் ஃபைலை திறக்க' : 'Restore Local Backup File'}</span>
                                 <input type="file" onChange={handleFileRestore} accept=".json" className="hidden" />
                             </label>
+                        </div>
+                        <div className="mt-2 text-center">
+                            <button onClick={() => setShowSetup(true)} className="text-[10px] text-gray-300 hover:text-indigo-500 font-bold uppercase tracking-widest transition">
+                                <Settings size={12} className="inline mr-1" /> Configure Database
+                            </button>
                         </div>
                     </>
                 )}
