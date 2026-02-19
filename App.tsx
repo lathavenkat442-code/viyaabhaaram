@@ -43,7 +43,8 @@ import {
   KeyRound,
   Database,
   Settings,
-  CloudUpload
+  CloudUpload,
+  CheckCircle2
 } from 'lucide-react';
 
 // Unified Security Action State
@@ -54,6 +55,26 @@ interface SecurityAction {
 }
 
 const EXPENSE_CATEGORIES = ['Salary', 'Rent', 'Tea/Snacks', 'Transport', 'Purchase', 'Sales', 'Electricity', 'Maintenance', 'Others'];
+
+const Toast: React.FC<{ message: string; show: boolean; onClose: () => void }> = ({ message, show, onClose }) => {
+    useEffect(() => {
+        if (show) {
+            const timer = setTimeout(onClose, 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [show, onClose]);
+
+    if (!show) return null;
+
+    return (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-top duration-300">
+            <div className="bg-green-600 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 border border-green-500/50 backdrop-blur-sm">
+                <CheckCircle2 size={20} className="text-green-100" />
+                <span className="font-bold text-sm tamil-font">{message}</span>
+            </div>
+        </div>
+    );
+};
 
 const DatabaseConfigModal: React.FC<{ onClose: () => void; language: 'ta' | 'en' }> = ({ onClose, language }) => {
     const [setupUrl, setSetupUrl] = useState(localStorage.getItem('viyabaari_supabase_url') || '');
@@ -126,7 +147,6 @@ const AddTransactionModal: React.FC<{
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -269,19 +289,14 @@ const AddStockModal: React.FC<{
   const [category, setCategory] = useState(initialData?.category || '');
   const [price, setPrice] = useState(initialData?.price.toString() || '');
   
-  // Custom Dropdown State
   const [activeDropdown, setActiveDropdown] = useState<{ vIdx: number, sIdx: number, field: 'color' | 'size' | 'sleeve' } | null>(null);
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
-  
-  // Ref for clicking outside main category dropdown
   const categoryDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Variants State
   const [variants, setVariants] = useState<StockVariant[]>(() => {
     if (initialData?.variants && initialData.variants.length > 0) {
       return initialData.variants;
     }
-    // Migration for old data or new item
     if (initialData?.imageUrl) {
        return [{
            id: Date.now().toString(),
@@ -294,20 +309,13 @@ const AddStockModal: React.FC<{
 
   const [activeVariantIndex, setActiveVariantIndex] = useState(0);
 
-  // Close dropdowns on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-        // Close Active Variant Dropdown
-        if (activeDropdown) {
-             setActiveDropdown(null);
-        }
-        // Close Category Dropdown
+        if (activeDropdown) setActiveDropdown(null);
         if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target as Node)) {
             setShowCategoryDropdown(false);
         }
     };
-    
-    // Add listener only if a dropdown is open to avoid unnecessary checks
     if (activeDropdown || showCategoryDropdown) {
         window.addEventListener('click', handleClickOutside);
     }
@@ -364,15 +372,12 @@ const AddStockModal: React.FC<{
     e.preventDefault();
     if (!name || !price || !category) return;
     
-    // Clean up empty stocks
     const cleanedVariants = variants.map(v => ({
         ...v,
         sizeStocks: v.sizeStocks.filter(s => s.quantity > 0 || s.size !== 'General')
     })).filter(v => v.imageUrl || v.sizeStocks.length > 0);
 
-    // If no variants, add a dummy one if needed, but validation above handles it.
     if (cleanedVariants.length === 0) {
-        // Allow creating item without variants? Maybe just minimal info
         cleanedVariants.push({ id: Date.now().toString(), imageUrl: '', sizeStocks: [] });
     }
 
@@ -399,7 +404,6 @@ const AddStockModal: React.FC<{
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-           {/* Basic Info */}
            <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2">
                  <label className="text-xs font-bold text-gray-400 uppercase ml-1 mb-1 block">{t.itemName}</label>
@@ -458,7 +462,6 @@ const AddStockModal: React.FC<{
               </div>
            </div>
 
-           {/* Variants Section */}
            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
               <div className="flex items-center justify-between mb-3">
                  <h3 className="font-bold text-sm text-gray-700 flex items-center gap-2">
@@ -470,7 +473,6 @@ const AddStockModal: React.FC<{
                  </button>
               </div>
 
-              {/* Variant Tabs */}
               <div className="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-hide">
                   {variants.map((v, idx) => (
                       <button 
@@ -493,10 +495,8 @@ const AddStockModal: React.FC<{
                   ))}
               </div>
 
-              {/* Active Variant Editor */}
               {currentVariant && (
                   <div className="space-y-4 animate-in fade-in">
-                      {/* Image Upload */}
                       <div className="relative aspect-video bg-white rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center overflow-hidden group">
                           {currentVariant.imageUrl ? (
                               <>
@@ -522,7 +522,6 @@ const AddStockModal: React.FC<{
                           )}
                       </div>
 
-                      {/* Stock Entries */}
                       <div className="space-y-2">
                           {currentVariant.sizeStocks.map((stock, sIdx) => (
                               <div key={sIdx} className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm space-y-2 relative">
@@ -530,7 +529,6 @@ const AddStockModal: React.FC<{
                                       <X size={16} />
                                   </button>
                                   <div className="grid grid-cols-2 gap-2 pr-6">
-                                      {/* Color Input (Custom Dropdown) */}
                                       <div className="relative">
                                           <label className="text-[10px] font-bold text-gray-400 uppercase">{t.color}</label>
                                           <div 
@@ -557,7 +555,6 @@ const AddStockModal: React.FC<{
                                           )}
                                       </div>
 
-                                      {/* Sleeve Select (Custom Dropdown) */}
                                       <div className="relative">
                                           <label className="text-[10px] font-bold text-gray-400 uppercase">{t.sleeve}</label>
                                           <div 
@@ -577,7 +574,6 @@ const AddStockModal: React.FC<{
                                           )}
                                       </div>
 
-                                      {/* Size Input (Custom Dropdown) */}
                                       <div className="relative">
                                           <label className="text-[10px] font-bold text-gray-400 uppercase">{t.size}</label>
                                           <div 
@@ -608,7 +604,6 @@ const AddStockModal: React.FC<{
                                           )}
                                       </div>
 
-                                      {/* Quantity Input */}
                                       <div>
                                           <label className="text-[10px] font-bold text-gray-400 uppercase">{t.quantity}</label>
                                           <div className="flex items-center">
@@ -653,26 +648,21 @@ const App: React.FC = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSyncing, setIsSyncing] = useState(false);
   
-  // Stock States
   const [isAddingStock, setIsAddingStock] = useState(false);
   const [editingStock, setEditingStock] = useState<StockItem | null>(null);
-  
-  // Transaction States
   const [isAddingTransaction, setIsAddingTransaction] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
-  
-  // Security / OTP Modal State
   const [securityAction, setSecurityAction] = useState<SecurityAction | null>(null);
   const [securityOtp, setSecurityOtp] = useState<string>('');
-  
-  // Database Config Modal
   const [showDatabaseConfig, setShowDatabaseConfig] = useState(false);
-  
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
 
+  // Toast State
+  const [toastMessage, setToastMessage] = useState('');
+  const [showToast, setShowToast] = useState(false);
+
   useEffect(() => {
-    // FIX: Explicitly typing event as any to avoid window type errors during build
     window.addEventListener('beforeinstallprompt' as any, (e: any) => {
       e.preventDefault();
       setDeferredPrompt(e);
@@ -684,7 +674,6 @@ const App: React.FC = () => {
       setDeferredPrompt(null);
     });
     
-    // Online/Offline Listeners
     window.addEventListener('online', () => setIsOnline(true));
     window.addEventListener('offline', () => setIsOnline(false));
     
@@ -693,7 +682,6 @@ const App: React.FC = () => {
       setLanguage(savedLang);
     }
 
-    // Check existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setUser({
@@ -704,7 +692,6 @@ const App: React.FC = () => {
             isLoggedIn: true
         });
       } else {
-        // Fallback to local storage user if no supabase session (Offline mode or legacy)
         const savedUser = localStorage.getItem('viyabaari_active_user');
         if (savedUser) {
            setUser(JSON.parse(savedUser));
@@ -712,7 +699,6 @@ const App: React.FC = () => {
       }
     });
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
         if (session?.user) {
             setUser({
@@ -728,193 +714,75 @@ const App: React.FC = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const handleInstallClick = async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setShowInstallBanner(false);
-    }
-    setDeferredPrompt(null);
-  };
-
-  // --- DATA SYNC (Supabase) ---
   const fetchData = useCallback(async (isManualRefresh = false) => {
       if (!user) return;
+      const savedStocks = localStorage.getItem(`viyabaari_stocks_${user.email}`);
+      const savedTxns = localStorage.getItem(`viyabaari_txns_${user.email}`);
+      if (savedStocks) setStocks(JSON.parse(savedStocks));
+      if (savedTxns) setTransactions(JSON.parse(savedTxns));
 
-      // 1. Always load local data first for immediate UI (unless manual refresh)
-      if (!isManualRefresh && user.email) {
-           const savedStocks = localStorage.getItem(`viyabaari_stocks_${user.email}`);
-           const savedTxns = localStorage.getItem(`viyabaari_txns_${user.email}`);
-           if (savedStocks) {
-               setStocks(JSON.parse(savedStocks));
-           }
-           if (savedTxns) {
-               setTransactions(JSON.parse(savedTxns));
-           }
-      }
-
-      // 2. If Online and Valid User, Fetch from Cloud
       if (user.uid && isOnline) {
           if (isManualRefresh) setIsSyncing(true);
-          
           try {
-              // Fetch Stocks
-              const { data: stockData, error: stockError } = await supabase
-                  .from('stock_items')
-                  .select('*') // Select ALL to be safe
-                  .eq('user_id', user.uid);
-              
+              const { data: stockData, error: stockError } = await supabase.from('stock_items').select('content').eq('user_id', user.uid);
               if (!stockError && stockData) {
-                  // Handle potential JSON string vs Object differences
-                  const parsedStocks = stockData.map((row: any) => 
-                      typeof row.content === 'string' ? JSON.parse(row.content) : row.content
-                  );
-                  
-                  // Sort
-                  parsedStocks.sort((a: StockItem, b: StockItem) => (b.lastUpdated || 0) - (a.lastUpdated || 0));
-                  
-                  // Update State & Cache
-                  setStocks(parsedStocks);
-                  localStorage.setItem(`viyabaari_stocks_${user.email}`, JSON.stringify(parsedStocks));
+                  const cloudStocks = stockData.map((row: any) => typeof row.content === 'string' ? JSON.parse(row.content) : row.content);
+                  cloudStocks.sort((a: StockItem, b: StockItem) => (b.lastUpdated || 0) - (a.lastUpdated || 0));
+                  setStocks(cloudStocks);
+                  localStorage.setItem(`viyabaari_stocks_${user.email}`, JSON.stringify(cloudStocks));
               }
-
-              // Fetch Transactions
-              const { data: txnData, error: txnError } = await supabase
-                  .from('transactions')
-                  .select('*') // Select ALL to be safe
-                  .eq('user_id', user.uid);
-
+              const { data: txnData, error: txnError } = await supabase.from('transactions').select('content').eq('user_id', user.uid);
               if (!txnError && txnData) {
-                  const parsedTxns = txnData.map((row: any) => 
-                      typeof row.content === 'string' ? JSON.parse(row.content) : row.content
-                  );
-                  
-                  parsedTxns.sort((a: Transaction, b: Transaction) => (b.date || 0) - (a.date || 0));
-                  
-                  setTransactions(parsedTxns);
-                  localStorage.setItem(`viyabaari_txns_${user.email}`, JSON.stringify(parsedTxns));
+                  const cloudTxns = txnData.map((row: any) => typeof row.content === 'string' ? JSON.parse(row.content) : row.content);
+                  cloudTxns.sort((a: Transaction, b: Transaction) => (b.date || 0) - (a.date || 0));
+                  setTransactions(cloudTxns);
+                  localStorage.setItem(`viyabaari_txns_${user.email}`, JSON.stringify(cloudTxns));
               }
-
-          } catch (err) {
-              console.error("Sync Error:", err);
-          } finally {
-              if (isManualRefresh) setTimeout(() => setIsSyncing(false), 500);
-          }
+          } catch (err) { console.error(err); }
+          finally { if (isManualRefresh) setTimeout(() => setIsSyncing(false), 500); }
       }
   }, [user, isOnline]);
 
-  // Initial Fetch & Realtime Subscription
   useEffect(() => {
-    if (user?.uid && isOnline) {
+    if (user) {
         fetchData(); 
-
-        // Subscribe to real-time changes
-        const channel = supabase.channel('db-changes')
-          .on(
-            'postgres_changes',
-            {
-              event: '*',
-              schema: 'public',
-              table: 'stock_items',
-              filter: `user_id=eq.${user.uid}`
-            },
-            (payload) => {
-              console.log('Stock updated remotely', payload);
-              fetchData();
-            }
-          )
-          .on(
-            'postgres_changes',
-            {
-              event: '*',
-              schema: 'public',
-              table: 'transactions',
-              filter: `user_id=eq.${user.uid}`
-            },
-            (payload) => {
-              console.log('Transaction updated remotely', payload);
-              fetchData();
-            }
-          )
-          .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    } else {
-        // Fallback for offline/guest
-        if (user?.email) {
-            const savedStocks = localStorage.getItem(`viyabaari_stocks_${user.email}`);
-            const savedTxns = localStorage.getItem(`viyabaari_txns_${user.email}`);
-            if (savedStocks) setStocks(JSON.parse(savedStocks));
-            if (savedTxns) setTransactions(JSON.parse(savedTxns));
+        if (user.uid && isOnline) {
+            const channel = supabase.channel('db-changes')
+              .on('postgres_changes', { event: '*', schema: 'public', table: 'stock_items', filter: `user_id=eq.${user.uid}` }, () => fetchData())
+              .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions', filter: `user_id=eq.${user.uid}` }, () => fetchData())
+              .subscribe();
+            return () => { supabase.removeChannel(channel); };
         }
     }
-  }, [fetchData, user?.uid, isOnline, user?.email]);
+  }, [fetchData, user?.uid, isOnline]);
 
   const saveStock = async (itemData: Omit<StockItem, 'id' | 'lastUpdated' | 'history'>, id?: string) => {
     setIsLoading(true);
-    const sanitizedVariants = itemData.variants.map(v => ({
-        ...v,
-        sizeStocks: v.sizeStocks || [{ size: 'General', quantity: 0 }]
-    }));
-    
+    const sanitizedVariants = itemData.variants.map(v => ({ ...v, sizeStocks: v.sizeStocks || [{ size: 'General', quantity: 0 }] }));
     let newItem: StockItem;
 
     if (id) {
         const existingItem = stocks.find(s => s.id === id);
         if (!existingItem) { setIsLoading(false); return; }
-
         const oldHistory = existingItem.history || [];
         const newHistory = [...oldHistory];
-        
         const oldPrice = existingItem.price;
         const newPrice = itemData.price;
         const oldQty = existingItem.variants ? existingItem.variants.reduce((acc, v) => acc + v.sizeStocks.reduce((sum, ss) => sum + ss.quantity, 0), 0) : 0;
         const newQty = sanitizedVariants.reduce((acc, v) => acc + v.sizeStocks.reduce((sum, ss) => sum + ss.quantity, 0), 0);
         let actionAdded = false;
-
-        if (oldPrice !== newPrice) {
-            newHistory.unshift({ date: Date.now(), action: 'PRICE_CHANGE', description: 'Price Updated', change: `₹${oldPrice} ➔ ₹${newPrice}` });
-            actionAdded = true;
-        }
-        if (oldQty !== newQty) {
-            const diff = newQty - oldQty;
-            const sign = diff > 0 ? '+' : '';
-            newHistory.unshift({ date: Date.now(), action: 'STOCK_CHANGE', description: 'Stock Quantity Updated', change: `${oldQty} ➔ ${newQty} (${sign}${diff})` });
-            actionAdded = true;
-        }
-        if (!actionAdded && (existingItem.name !== itemData.name || existingItem.category !== itemData.category)) {
-            newHistory.unshift({ date: Date.now(), action: 'UPDATED', description: 'Item Details Updated' });
-        }
-
+        if (oldPrice !== newPrice) { newHistory.unshift({ date: Date.now(), action: 'PRICE_CHANGE', description: 'Price Updated', change: `₹${oldPrice} ➔ ₹${newPrice}` }); actionAdded = true; }
+        if (oldQty !== newQty) { const diff = newQty - oldQty; const sign = diff > 0 ? '+' : ''; newHistory.unshift({ date: Date.now(), action: 'STOCK_CHANGE', description: 'Stock Quantity Updated', change: `${oldQty} ➔ ${newQty} (${sign}${diff})` }); actionAdded = true; }
+        if (!actionAdded && (existingItem.name !== itemData.name || existingItem.category !== itemData.category)) newHistory.unshift({ date: Date.now(), action: 'UPDATED', description: 'Item Details Updated' });
         newItem = { ...itemData, variants: sanitizedVariants, id, lastUpdated: Date.now(), history: newHistory };
         setStocks(prev => prev.map(s => s.id === id ? newItem : s));
-
     } else {
         const initialQty = sanitizedVariants.reduce((acc, v) => acc + v.sizeStocks.reduce((sum, ss) => sum + ss.quantity, 0), 0);
-        const newHistory: StockHistory[] = [{ date: Date.now(), action: 'CREATED', description: 'Item Created', change: `Initial Stock: ${initialQty}` }];
-
-        newItem = { ...itemData, variants: sanitizedVariants, id: Date.now().toString(), lastUpdated: Date.now(), history: newHistory };
+        newItem = { ...itemData, variants: sanitizedVariants, id: Date.now().toString(), lastUpdated: Date.now(), history: [{ date: Date.now(), action: 'CREATED', description: 'Item Created', change: `Initial Stock: ${initialQty}` }] };
         setStocks(prev => [newItem, ...prev]);
     }
 
-    // Persist to Supabase
-    if (user?.uid && isOnline) {
-        const { error } = await supabase.from('stock_items').upsert({
-            id: newItem.id,
-            user_id: user.uid,
-            content: newItem,
-            last_updated: newItem.lastUpdated
-        });
-        if (error) {
-            console.error("Sync Error:", error);
-            alert(`ஆன்லைன் சேமிப்பு தோல்வி (Save Failed): ${error.message}.\n\nதீர்வு: Supabase Dashboard -> SQL Editor சென்று Tables உருவாக்கவும்.`);
-        }
-    }
-    
-    // Update Local Cache
+    if (user?.uid && isOnline) await supabase.from('stock_items').upsert({ id: newItem.id, user_id: user.uid, content: newItem, last_updated: newItem.lastUpdated });
     if (user?.email) {
         const updatedStocks = id ? stocks.map(s => s.id === id ? newItem : s) : [newItem, ...stocks];
         localStorage.setItem(`viyabaari_stocks_${user.email}`, JSON.stringify(updatedStocks));
@@ -923,63 +791,28 @@ const App: React.FC = () => {
     setIsLoading(false);
     setIsAddingStock(false);
     setEditingStock(null);
-  };
-
-  const initiateDeleteStock = (id: string) => {
-    const otp = Math.floor(1000 + Math.random() * 9000).toString();
-    setSecurityOtp(otp);
-    setSecurityAction({ type: 'DELETE_STOCK', payload: id });
-  };
-
-  const initiateClearTransactions = () => {
-    const otp = Math.floor(1000 + Math.random() * 9000).toString();
-    setSecurityOtp(otp);
-    setSecurityAction({ type: 'CLEAR_TXNS' });
-  };
-
-  const initiateResetApp = () => {
-    const otp = Math.floor(1000 + Math.random() * 9000).toString();
-    setSecurityOtp(otp);
-    setSecurityAction({ type: 'RESET_APP' });
+    setToastMessage(language === 'ta' ? 'வெற்றிகரமாக சேமிக்கப்பட்டது!' : 'Saved Successfully!');
+    setShowToast(true);
   };
 
   const executeSecurityAction = async () => {
      if (!securityAction) return;
      setIsLoading(true);
-     
      if (securityAction.type === 'DELETE_STOCK') {
          setStocks(prev => prev.filter(s => s.id !== securityAction.payload));
-         if (user?.uid && isOnline) {
-             const { error } = await supabase.from('stock_items').delete().eq('id', securityAction.payload).eq('user_id', user.uid);
-             if (error) alert(`Delete Failed: ${error.message}`);
-         }
+         if (user?.uid && isOnline) await supabase.from('stock_items').delete().eq('id', securityAction.payload).eq('user_id', user.uid);
      } else if (securityAction.type === 'CLEAR_TXNS') {
          setTransactions([]);
-         if (user?.uid && isOnline) {
-             const { error } = await supabase.from('transactions').delete().eq('user_id', user.uid);
-             if (error) alert(`Delete Failed: ${error.message}`);
-         }
+         if (user?.uid && isOnline) await supabase.from('transactions').delete().eq('user_id', user.uid);
      } else if (securityAction.type === 'RESET_APP') {
-         setStocks([]);
-         setTransactions([]);
-         if (user?.uid && isOnline) {
-             await supabase.from('stock_items').delete().eq('user_id', user.uid);
-             await supabase.from('transactions').delete().eq('user_id', user.uid);
-         }
+         setStocks([]); setTransactions([]);
+         if (user?.uid && isOnline) { await supabase.from('stock_items').delete().eq('user_id', user.uid); await supabase.from('transactions').delete().eq('user_id', user.uid); }
      }
-     
      if (user?.email) {
-         if (securityAction.type === 'DELETE_STOCK') {
-             const updated = stocks.filter(s => s.id !== securityAction.payload);
-             localStorage.setItem(`viyabaari_stocks_${user.email}`, JSON.stringify(updated));
-         } else if (securityAction.type === 'CLEAR_TXNS') {
-             localStorage.setItem(`viyabaari_txns_${user.email}`, JSON.stringify([]));
-         } else {
-             localStorage.removeItem(`viyabaari_stocks_${user.email}`);
-             localStorage.removeItem(`viyabaari_txns_${user.email}`);
-         }
+         if (securityAction.type === 'DELETE_STOCK') localStorage.setItem(`viyabaari_stocks_${user.email}`, JSON.stringify(stocks.filter(s => s.id !== securityAction.payload)));
+         else if (securityAction.type === 'CLEAR_TXNS') localStorage.setItem(`viyabaari_txns_${user.email}`, JSON.stringify([]));
+         else { localStorage.removeItem(`viyabaari_stocks_${user.email}`); localStorage.removeItem(`viyabaari_txns_${user.email}`); }
      }
-     
      setIsLoading(false);
      setSecurityAction(null);
      setSecurityOtp('');
@@ -988,116 +821,45 @@ const App: React.FC = () => {
   const saveTransaction = async (txnData: Omit<Transaction, 'id' | 'date'>, id?: string, date?: number) => {
     setIsLoading(true);
     let newTxn: Transaction;
-
-    if (id && date) {
-        newTxn = { ...txnData, id, date };
-        setTransactions(prev => prev.map(t => t.id === id ? newTxn : t));
-    } else {
-        newTxn = { ...txnData, id: Date.now().toString(), date: Date.now() };
-        setTransactions(prev => [newTxn, ...prev]);
-    }
-
-    if (user?.uid && isOnline) {
-        const { error } = await supabase.from('transactions').upsert({
-            id: newTxn.id,
-            user_id: user.uid,
-            content: newTxn,
-            date: newTxn.date
-        });
-        if (error) {
-            console.error("Sync Error:", error);
-            alert(`ஆன்லைன் சேமிப்பு தோல்வி (Save Failed): ${error.message}. SQL Tables சரிபார்க்கவும்.`);
-        }
-    }
-
+    if (id && date) { newTxn = { ...txnData, id, date }; setTransactions(prev => prev.map(t => t.id === id ? newTxn : t)); }
+    else { newTxn = { ...txnData, id: Date.now().toString(), date: Date.now() }; setTransactions(prev => [newTxn, ...prev]); }
+    if (user?.uid && isOnline) await supabase.from('transactions').upsert({ id: newTxn.id, user_id: user.uid, content: newTxn, date: newTxn.date });
     if (user?.email) {
         const updatedTxns = id ? transactions.map(t => t.id === id ? newTxn : t) : [newTxn, ...transactions];
         localStorage.setItem(`viyabaari_txns_${user.email}`, JSON.stringify(updatedTxns));
     }
-
     setIsLoading(false);
     setIsAddingTransaction(false);
     setEditingTransaction(null);
+    setToastMessage(language === 'ta' ? 'வெற்றிகரமாக சேமிக்கப்பட்டது!' : 'Saved Successfully!');
+    setShowToast(true);
   };
-  
-  // Manual Sync Up Function (Push Local to Server)
+
   const handleManualPush = async () => {
-      if(!user?.uid || !isOnline) {
-          alert(language === 'ta' ? 'இணைய இணைப்பு தேவை' : 'Online connection required');
-          return;
-      }
+      if(!user?.uid || !isOnline) { alert(language === 'ta' ? 'இணைய இணைப்பு தேவை' : 'Online connection required'); return; }
       setIsSyncing(true);
-      
-      // Push Stocks
-      for(const s of stocks) {
-          await supabase.from('stock_items').upsert({
-              id: s.id,
-              user_id: user.uid,
-              content: s,
-              last_updated: s.lastUpdated
-          });
-      }
-      
-      // Push Transactions
-      for(const t of transactions) {
-          await supabase.from('transactions').upsert({
-              id: t.id,
-              user_id: user.uid,
-              content: t,
-              date: t.date
-          });
-      }
-      
+      for(const s of stocks) await supabase.from('stock_items').upsert({ id: s.id, user_id: user.uid, content: s, last_updated: s.lastUpdated });
+      for(const t of transactions) await supabase.from('transactions').upsert({ id: t.id, user_id: user.uid, content: t, date: t.date });
       setIsSyncing(false);
-      alert(language === 'ta' ? 'டேட்டா ஆன்லைனில் வெற்றிகரமாக ஏற்றப்பட்டது!' : 'Data synced to server successfully!');
+      setToastMessage(language === 'ta' ? 'ஆன்லைனில் சேமிக்கப்பட்டது!' : 'Synced to Cloud!');
+      setShowToast(true);
   };
 
-  const handleLogin = (u: User) => {
-    setUser(u);
-    localStorage.setItem('viyabaari_active_user', JSON.stringify(u));
-  };
-
-  const handleUpdateUser = (updatedUser: User) => {
-    setUser(updatedUser);
-    localStorage.setItem('viyabaari_active_user', JSON.stringify(updatedUser));
-  };
-
-  const handleLogout = async () => {
-    if (isOnline) await supabase.auth.signOut();
-    setUser(null);
-    localStorage.removeItem('viyabaari_active_user');
-    setActiveTab('dashboard');
-  };
-
-  const toggleLanguage = (lang: 'ta' | 'en') => {
-    setLanguage(lang);
-    localStorage.setItem('viyabaari_lang', lang);
-  };
-
-  const handleRestoreData = (data: any) => {
-    if (data && data.user && Array.isArray(data.stocks)) {
-      handleLogin(data.user);
-      setStocks(data.stocks);
-      setTransactions(Array.isArray(data.transactions) ? data.transactions : []);
-      alert(language === 'ta' ? 'தரவு வெற்றிகரமாக மீட்டெடுக்கப்பட்டது! (Local)' : 'Data restored successfully! (Local)');
-    } else {
-      alert(language === 'ta' ? 'தவறான கோப்பு (Invalid File)' : 'Invalid backup file structure');
-    }
-  };
-
-  const lowStockCount = useMemo(() => {
-    return stocks.filter(s => s.variants?.some(v => v.sizeStocks?.some(ss => ss.quantity < 5))).length;
-  }, [stocks]);
+  const handleLogin = (u: User) => { setUser(u); localStorage.setItem('viyabaari_active_user', JSON.stringify(u)); };
+  const handleUpdateUser = (updatedUser: User) => { setUser(updatedUser); localStorage.setItem('viyabaari_active_user', JSON.stringify(updatedUser)); };
+  const handleLogout = async () => { if (isOnline) await supabase.auth.signOut(); setUser(null); localStorage.removeItem('viyabaari_active_user'); setActiveTab('dashboard'); };
 
   const t = TRANSLATIONS[language];
+  const lowStockCount = useMemo(() => stocks.filter(s => s.variants?.some(v => v.sizeStocks?.some(ss => ss.quantity < 5))).length, [stocks]);
 
   if (!user) {
-    return <AuthScreen onLogin={handleLogin} onRestore={handleRestoreData} language={language} t={t} isOnline={isOnline} />;
+    return <AuthScreen onLogin={handleLogin} onRestore={(d) => { handleLogin(d.user); setStocks(d.stocks); setTransactions(d.transactions); }} language={language} t={t} isOnline={isOnline} />;
   }
 
   return (
     <div className="max-w-md mx-auto min-h-screen bg-slate-50 flex flex-col shadow-xl">
-      {/* ... (Existing Installation Banner) ... */}
+      <Toast message={toastMessage} show={showToast} onClose={() => setShowToast(false)} />
+
       {showInstallBanner && (
         <div className="bg-indigo-700 text-white p-4 flex items-center justify-between sticky top-0 z-50 animate-in slide-in-from-top duration-300">
            <div className="flex items-center gap-3">
@@ -1108,117 +870,53 @@ const App: React.FC = () => {
               </div>
            </div>
            <div className="flex gap-2">
-              <button onClick={handleInstallClick} className="bg-white text-indigo-700 px-4 py-2 rounded-xl text-xs font-black tamil-font shadow-lg">இன்ஸ்டால்</button>
+              <button onClick={() => { deferredPrompt.prompt(); setShowInstallBanner(false); }} className="bg-white text-indigo-700 px-4 py-2 rounded-xl text-xs font-black tamil-font shadow-lg">இன்ஸ்டால்</button>
               <button onClick={() => setShowInstallBanner(false)} className="p-2 opacity-50"><X size={16}/></button>
            </div>
         </div>
       )}
 
-      {/* Header */}
       <header className="bg-indigo-600 text-white p-4 sticky top-0 z-10 shadow-md flex justify-between items-center">
         <div className="flex items-center gap-2">
            <h1 className="text-xl font-bold tamil-font">{t.appName}</h1>
            {!isOnline && <WifiOff size={14} className="opacity-70" />}
         </div>
-        
         {isLoading ? (
             <Loader2 size={20} className="animate-spin text-white opacity-80" />
         ) : (
             <div className="flex gap-4">
-                {/* Manual Sync Button */}
                 {isOnline && user.uid && (
-                    <button 
-                        onClick={() => fetchData(true)} 
-                        className={`hover:bg-indigo-500 p-1 rounded-full transition ${isSyncing ? 'animate-spin' : ''}`}
-                        title={language === 'ta' ? 'Refresh' : 'Sync Now'}
-                    >
+                    <button onClick={() => fetchData(true)} className={`hover:bg-indigo-500 p-1 rounded-full transition ${isSyncing ? 'animate-spin' : ''}`}>
                         <RefreshCw size={22} />
                     </button>
                 )}
-                
-                {/* Manual Push Button (Only if items exist locally but may be missing on server) */}
                 {isOnline && user.uid && (stocks.length > 0 || transactions.length > 0) && (
-                     <button 
-                        onClick={handleManualPush}
-                        className="hover:bg-indigo-500 p-1 rounded-full transition"
-                        title={language === 'ta' ? 'ஆன்லைனில் ஏற்று (Push)' : 'Push to Server'}
-                     >
+                     <button onClick={handleManualPush} className="hover:bg-indigo-500 p-1 rounded-full transition">
                          <CloudUpload size={22} />
                      </button>
                 )}
-                
                 <button onClick={() => { setEditingStock(null); setIsAddingStock(true); }} className="hover:bg-indigo-500 p-1 rounded-full transition">
-                <PlusCircle size={22} />
+                    <PlusCircle size={22} />
                 </button>
                 <button onClick={() => { setEditingTransaction(null); setIsAddingTransaction(true); }} className="hover:bg-indigo-500 p-1 rounded-full transition">
-                <ArrowLeftRight size={22} />
+                    <ArrowLeftRight size={22} />
                 </button>
             </div>
         )}
       </header>
 
       <main className="flex-1 overflow-y-auto pb-24">
-        {activeTab === 'dashboard' && 
-            <Dashboard 
-                stocks={stocks} 
-                transactions={transactions} 
-                language={language} 
-                user={user} 
-                onSetupServer={() => setShowDatabaseConfig(true)}
-            />
-        }
-        {activeTab === 'stock' && <Inventory stocks={stocks} onDelete={initiateDeleteStock} onEdit={(item) => { setEditingStock(item); setIsAddingStock(true); }} language={language} />}
-        {activeTab === 'accounts' && 
-            <Accounting 
-                transactions={transactions} 
-                language={language} 
-                onEdit={(txn) => { setEditingTransaction(txn); setIsAddingTransaction(true); }}
-                onClear={initiateClearTransactions}
-            />
-        }
-        {activeTab === 'profile' && 
-          <Profile 
-            user={user} 
-            updateUser={handleUpdateUser} 
-            stocks={stocks} 
-            transactions={transactions} 
-            onLogout={handleLogout} 
-            onRestore={handleRestoreData} 
-            language={language} 
-            onLanguageChange={toggleLanguage}
-            onClearTransactions={initiateClearTransactions}
-            onResetApp={initiateResetApp}
-            onSetupServer={() => setShowDatabaseConfig(true)}
-          />
-        }
+        {activeTab === 'dashboard' && <Dashboard stocks={stocks} transactions={transactions} language={language} user={user} onSetupServer={() => setShowDatabaseConfig(true)} />}
+        {activeTab === 'stock' && <Inventory stocks={stocks} onDelete={(id) => { setSecurityOtp(Math.floor(1000 + Math.random() * 9000).toString()); setSecurityAction({ type: 'DELETE_STOCK', payload: id }); }} onEdit={(item) => { setEditingStock(item); setIsAddingStock(true); }} language={language} />}
+        {activeTab === 'accounts' && <Accounting transactions={transactions} language={language} onEdit={(txn) => { setEditingTransaction(txn); setIsAddingTransaction(true); }} onClear={() => { setSecurityOtp(Math.floor(1000 + Math.random() * 9000).toString()); setSecurityAction({ type: 'CLEAR_TXNS' }); }} />}
+        {activeTab === 'profile' && <Profile user={user} updateUser={handleUpdateUser} stocks={stocks} transactions={transactions} onLogout={handleLogout} onRestore={(d) => { handleLogin(d.user); setStocks(d.stocks); setTransactions(d.transactions); }} language={language} onLanguageChange={(l) => { setLanguage(l); localStorage.setItem('viyabaari_lang', l); }} onClearTransactions={() => { setSecurityOtp(Math.floor(1000 + Math.random() * 9000).toString()); setSecurityAction({ type: 'CLEAR_TXNS' }); }} onResetApp={() => { setSecurityOtp(Math.floor(1000 + Math.random() * 9000).toString()); setSecurityAction({ type: 'RESET_APP' }); }} onSetupServer={() => setShowDatabaseConfig(true)} />}
       </main>
 
-      {/* Security Action OTP Modal */}
-      {securityAction && (
-          <SecurityOtpModal 
-             otp={securityOtp}
-             actionType={securityAction.type}
-             onVerify={executeSecurityAction}
-             onCancel={() => { setSecurityAction(null); setSecurityOtp(''); }}
-             language={language}
-             t={t}
-          />
-      )}
-
-      {/* Modals */}
+      {securityAction && <SecurityOtpModal otp={securityOtp} actionType={securityAction.type} onVerify={executeSecurityAction} onCancel={() => setSecurityAction(null)} language={language} t={t} />}
       {showDatabaseConfig && <DatabaseConfigModal onClose={() => setShowDatabaseConfig(false)} language={language} />}
-      {isAddingStock && <AddStockModal onSave={saveStock} onClose={() => { setIsAddingStock(false); setEditingStock(null); }} initialData={editingStock || undefined} language={language} t={t} />}
-      {isAddingTransaction && (
-          <AddTransactionModal 
-            onSave={saveTransaction} 
-            onClose={() => { setIsAddingTransaction(false); setEditingTransaction(null); }} 
-            initialData={editingTransaction || undefined}
-            language={language} 
-            t={t} 
-          />
-      )}
+      {isAddingStock && <AddStockModal onSave={saveStock} onClose={() => setIsAddingStock(false)} initialData={editingStock || undefined} language={language} t={t} />}
+      {isAddingTransaction && <AddTransactionModal onSave={saveTransaction} onClose={() => setIsAddingTransaction(false)} initialData={editingTransaction || undefined} language={language} t={t} />}
 
-      {/* Nav */}
       <nav className="bg-white border-t border-gray-200 fixed bottom-0 w-full max-w-md flex justify-around p-3 z-10 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
         <button onClick={() => setActiveTab('dashboard')} className={`flex flex-col items-center ${activeTab === 'dashboard' ? 'text-indigo-600 font-bold' : 'text-gray-400'}`}>
           <LayoutDashboard size={24} />
@@ -1242,75 +940,34 @@ const App: React.FC = () => {
   );
 };
 
-// ... [SecurityOtpModal and AuthScreen components remain unchanged] ...
 const SecurityOtpModal: React.FC<{ otp: string; actionType: SecurityActionType; onVerify: () => void; onCancel: () => void; language: 'ta' | 'en'; t: any }> = ({ otp, actionType, onVerify, onCancel, language, t }) => {
     const [input, setInput] = useState('');
     const [error, setError] = useState(false);
-
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (input === otp) {
-            onVerify();
-        } else {
-            setError(true);
-            setTimeout(() => setError(false), 2000);
-        }
+        if (input === otp) onVerify();
+        else { setError(true); setTimeout(() => setError(false), 2000); }
     };
-
-    let title = '';
-    let message = '';
-    let confirmText = '';
-    
-    if (actionType === 'DELETE_STOCK') {
-        title = language === 'ta' ? 'சரக்கை நீக்க' : 'Delete Stock';
-        message = language === 'ta' ? 'இந்த பொருளை நீக்க விரும்புகிறீர்களா?' : 'Are you sure you want to delete this stock?';
-        confirmText = language === 'ta' ? 'நீக்குக' : 'Delete';
-    } else if (actionType === 'CLEAR_TXNS') {
-        title = language === 'ta' ? 'கணக்குகளை அழிக்க' : 'Clear All Transactions';
-        message = language === 'ta' ? 'எல்லா வரவு செலவு கணக்குகளையும் அழிக்கவா?' : 'Delete all income/expense entries?';
-        confirmText = language === 'ta' ? 'அழிக்கவும்' : 'Clear All';
-    } else if (actionType === 'RESET_APP') {
-        title = language === 'ta' ? 'செயலியை ரீசெட் செய்ய' : 'Factory Reset';
-        message = language === 'ta' ? 'எல்லா தரவுகளையும் (சரக்கு & கணக்கு) அழிக்கவா?' : 'Delete ALL data (Stocks & Transactions)?';
-        confirmText = language === 'ta' ? 'ரீசெட் செய்' : 'Reset Now';
-    }
-
+    const title = actionType === 'DELETE_STOCK' ? (language === 'ta' ? 'சரக்கை நீக்க' : 'Delete Stock') : actionType === 'CLEAR_TXNS' ? (language === 'ta' ? 'கணக்குகளை அழிக்க' : 'Clear All') : (language === 'ta' ? 'ரீசெட் செய்ய' : 'Reset');
     return (
         <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-6 backdrop-blur-sm animate-in fade-in">
              <div className="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl">
                  <div className="flex justify-between items-start mb-4">
                     <div className="flex items-center gap-3">
-                        <div className="p-3 bg-red-100 text-red-600 rounded-full">
-                            <AlertTriangle size={24} />
-                        </div>
+                        <div className="p-3 bg-red-100 text-red-600 rounded-full"><AlertTriangle size={24} /></div>
                         <h3 className="text-lg font-black text-gray-800 tamil-font">{title}</h3>
                     </div>
                     <button onClick={onCancel} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200"><X size={16} /></button>
                  </div>
-                 
-                 <p className="text-sm text-gray-500 mb-6 font-medium tamil-font">{message}</p>
-                 
                  <div className="bg-slate-100 p-4 rounded-xl text-center mb-6 border border-slate-200">
-                     <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider mb-1">{language === 'ta' ? 'கீழே உள்ள OTP ஐ டைப் செய்யவும்' : 'Type the OTP below'}</p>
+                     <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider mb-1">{language === 'ta' ? 'OTP-ஐ டைப் செய்யவும்' : 'Type the OTP'}</p>
                      <p className="text-3xl font-black text-slate-800 tracking-[0.2em]">{otp}</p>
                  </div>
-
                  <form onSubmit={handleSubmit} className="space-y-4">
-                     <div>
-                         <input 
-                            type="number" 
-                            value={input} 
-                            onChange={e => setInput(e.target.value)}
-                            placeholder="OTP"
-                            className={`w-full p-4 text-center text-xl font-bold rounded-xl border-2 outline-none transition text-gray-900 ${error ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-white focus:border-indigo-500'}`}
-                            autoFocus
-                         />
-                         {error && <p className="text-xs text-red-500 text-center mt-2 font-bold">{t.invalidOtp}</p>}
-                     </div>
-
+                     <input type="number" value={input} onChange={e => setInput(e.target.value)} placeholder="OTP" className={`w-full p-4 text-center text-xl font-bold rounded-xl border-2 outline-none transition text-gray-900 ${error ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-white focus:border-indigo-500'}`} autoFocus />
                      <div className="flex gap-3 pt-2">
                          <button type="button" onClick={onCancel} className="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200">{t.cancel}</button>
-                         <button type="submit" className="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 shadow-lg shadow-red-200">{confirmText}</button>
+                         <button type="submit" className="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 shadow-lg shadow-red-200">{language === 'ta' ? 'சரிபார்' : 'Verify'}</button>
                      </div>
                  </form>
              </div>
@@ -1326,295 +983,69 @@ const AuthScreen: React.FC<{ onLogin: (u: User) => void; onRestore: (d: any) => 
     const [mobile, setMobile] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
-    
-    // Manual Config State (kept for initial login flow if needed, but redundant with global modal now)
     const [showSetup, setShowSetup] = useState(false);
-    const [setupUrl, setSetupUrl] = useState('');
-    const [setupKey, setSetupKey] = useState('');
-
     const handleAuth = async (e: React.FormEvent) => {
       e.preventDefault();
       setIsLoading(true);
-
-      if (!isOnline) {
-          alert("No Internet Connection. Please connect to login.");
-          setIsLoading(false);
-          return;
-      }
-      
-      if (!isSupabaseConfigured) {
-          // If trying to login but not configured, show setup
-          setShowSetup(true);
-          setIsLoading(false);
-          return;
-      }
-
+      if (!isOnline) { alert("No Internet Connection."); setIsLoading(false); return; }
+      if (!isSupabaseConfigured) { setShowSetup(true); setIsLoading(false); return; }
       try {
         if (mode === 'REGISTER') {
-             const { data, error } = await supabase.auth.signUp({
-                 email,
-                 password,
-                 options: {
-                     data: { name, mobile }
-                 }
-             });
+             const { error } = await supabase.auth.signUp({ email, password, options: { data: { name, mobile } } });
              if (error) throw error;
-             alert(language === 'ta' ? 'பதிவு வெற்றி! இப்போது உள்நுழையலாம்.' : 'Registration success! Please login.');
+             alert(language === 'ta' ? 'பதிவு வெற்றி!' : 'Registration success!');
              setMode('LOGIN');
         } else {
-             const { data, error } = await supabase.auth.signInWithPassword({
-                 email,
-                 password
-             });
+             const { data, error } = await supabase.auth.signInWithPassword({ email, password });
              if (error) throw error;
-             
-             if (data.user) {
-                 const loggedInUser: User = {
-                     uid: data.user.id,
-                     email: data.user.email || '',
-                     name: data.user.user_metadata.name || 'User',
-                     mobile: data.user.user_metadata.mobile || '',
-                     isLoggedIn: true
-                 };
-                 onLogin(loggedInUser);
-             }
+             if (data.user) onLogin({ uid: data.user.id, email: data.user.email || '', name: data.user.user_metadata.name || 'User', mobile: data.user.user_metadata.mobile || '', isLoggedIn: true });
         }
-      } catch (err: any) {
-          alert(err.message || t.loginFailed);
-      } finally {
-          setIsLoading(false);
-      }
+      } catch (err: any) { alert(err.message || t.loginFailed); }
+      finally { setIsLoading(false); }
     };
-    
-    const handleSaveConfig = (e: React.FormEvent) => {
-        e.preventDefault();
-        saveSupabaseConfig(setupUrl, setupKey);
-    };
-
-    const handleForgotPassword = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setIsLoading(true);
-
-        if (!isOnline) {
-             alert("No Internet Connection.");
-             setIsLoading(false);
-             return;
-        }
-
-        try {
-            const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                redirectTo: window.location.href,
-            });
-            if (error) throw error;
-            alert(t.resetLinkSent);
-            setMode('LOGIN');
-        } catch (err: any) {
-             alert(err.message || "Failed to send reset link");
-        } finally {
-             setIsLoading(false);
-        }
-    };
-
-    const handleSkipLogin = () => {
-        const guestUser: User = {
-            email: 'guest@viyabaari.local',
-            name: 'Guest User',
-            mobile: '0000000000',
-            isLoggedIn: true,
-            // Password field removed for security
-        };
-        onLogin(guestUser);
-    };
-  
-    const handleFileRestore = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          try {
-            const data = JSON.parse(event.target?.result as string);
-            onRestore(data);
-          } catch (err) {
-            alert("Error parsing backup file");
-          }
-        };
-        reader.readAsText(file);
-      }
-      e.target.value = '';
-    };
-  
     if (showSetup || !isSupabaseConfigured) {
         return (
             <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white relative">
                 <div className="bg-white w-full max-w-sm rounded-[2rem] p-8 text-gray-800 shadow-2xl">
-                    <div className="text-center mb-6">
-                        <Database size={48} className="mx-auto text-indigo-600 mb-2"/>
-                        <h2 className="text-xl font-black text-gray-800 tamil-font">
-                            {language === 'ta' ? 'கிளவுட் டேட்டாபேஸ் செட்டிங்ஸ்' : 'Setup Cloud Database'}
-                        </h2>
-                        <p className="text-xs text-gray-500 tamil-font">
-                            {language === 'ta' ? 'ஆன்லைன் சிங்க் வசதியை பெற Supabase விவரங்களை உள்ளிடவும்.' : 'Enter Supabase Credentials to enable online sync.'}
-                        </p>
-                    </div>
-                    
-                    <form onSubmit={handleSaveConfig} className="space-y-4">
-                        <div>
-                            <label className="text-xs font-bold text-gray-400 uppercase">Supabase URL</label>
-                            <input 
-                                value={setupUrl} 
-                                onChange={e => setSetupUrl(e.target.value)} 
-                                className="w-full bg-gray-100 p-3 rounded-xl font-mono text-sm border focus:border-indigo-500 outline-none" 
-                                placeholder="https://xyz.supabase.co"
-                                required
-                            />
-                        </div>
-                        <div>
-                            <label className="text-xs font-bold text-gray-400 uppercase">Anon Key</label>
-                            <input 
-                                value={setupKey} 
-                                onChange={e => setSetupKey(e.target.value)} 
-                                className="w-full bg-gray-100 p-3 rounded-xl font-mono text-sm border focus:border-indigo-500 outline-none" 
-                                placeholder="eyJhbGciOiJIUzI1NiIsIn..."
-                                required
-                            />
-                        </div>
-                        
-                        <button className="w-full bg-indigo-600 text-white p-3 rounded-xl font-bold shadow-lg hover:bg-indigo-700 tamil-font">
-                            {language === 'ta' ? 'சேமித்து இணைக்க' : 'Save & Connect'}
-                        </button>
+                    <Database size={48} className="mx-auto text-indigo-600 mb-2"/>
+                    <h2 className="text-xl font-black text-gray-800 tamil-font text-center mb-6">Cloud Setup</h2>
+                    <form onSubmit={(e) => { e.preventDefault(); const url = (e.target as any).url.value; const key = (e.target as any).key.value; saveSupabaseConfig(url, key); }} className="space-y-4">
+                        <input name="url" className="w-full bg-gray-100 p-3 rounded-xl font-mono text-sm border outline-none" placeholder="Supabase URL" required defaultValue={localStorage.getItem('viyabaari_supabase_url') || ''} />
+                        <input name="key" className="w-full bg-gray-100 p-3 rounded-xl font-mono text-sm border outline-none" placeholder="Anon Key" required defaultValue={localStorage.getItem('viyabaari_supabase_key') || ''} />
+                        <button className="w-full bg-indigo-600 text-white p-3 rounded-xl font-bold">Save & Connect</button>
                     </form>
-                    
-                    <button onClick={() => setShowSetup(false)} className="w-full mt-4 text-gray-400 text-xs hover:text-gray-600 tamil-font">
-                        {language === 'ta' ? 'தவிர் / விருந்தினர் முறைக்கு திரும்ப' : 'Skip / Back to Guest Mode'}
-                    </button>
+                    <button onClick={() => setShowSetup(false)} className="w-full mt-4 text-gray-400 text-xs">Back</button>
                 </div>
             </div>
         );
     }
-  
     return (
       <div className="min-h-screen bg-indigo-600 flex flex-col items-center justify-center p-6 text-white relative">
          <h1 className="text-4xl font-black tamil-font mb-2 text-center">{t.appName}</h1>
-         <p className="text-indigo-200 mb-8 text-sm opacity-80">{language === 'ta' ? 'ஆன்லைன் அக்கவுண்ட்ஸ் (Supabase Cloud)' : 'Online Accounts (Supabase Cloud)'}</p>
-         
          <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 text-gray-800 shadow-2xl">
-              { !isSupabaseConfigured && (
-                  <div className="bg-amber-50 text-amber-700 p-3 rounded-xl mb-4 text-xs font-bold text-center border border-amber-100 flex items-center justify-center gap-2 cursor-pointer hover:bg-amber-100" onClick={() => setShowSetup(true)}>
-                    <WifiOff size={16} />
-                    <span className="tamil-font">{language === 'ta' ? 'ஆன்லைன் டேட்டாபேஸ் அமைக்க இங்கே கிளிக் செய்யவும்' : 'Click to Setup Online Database'}</span>
-                  </div>
-              )}
-
-              {/* Mode Toggle (Hide in Forgot Password) */}
-              {mode !== 'FORGOT_PASSWORD' && (
-                  <div className="flex gap-4 mb-8 bg-gray-100 p-1 rounded-2xl">
-                      <button onClick={() => setMode('LOGIN')} className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${mode === 'LOGIN' ? 'bg-white shadow-md text-indigo-600' : 'text-gray-400'}`}>
-                      <div className="flex items-center justify-center gap-2">
-                          <LogIn size={16}/> {language === 'ta' ? 'உள்நுழைய' : 'Login'}
-                      </div>
-                      </button>
-                      <button onClick={() => setMode('REGISTER')} className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${mode === 'REGISTER' ? 'bg-white shadow-md text-indigo-600' : 'text-gray-400'}`}>
-                      <div className="flex items-center justify-center gap-2">
-                          <UserPlus size={16}/> {language === 'ta' ? 'பதிவு செய்ய' : 'Sign Up'}
-                      </div>
-                      </button>
-                  </div>
-              )}
-              
-              {mode === 'FORGOT_PASSWORD' && (
-                  <div className="mb-6 text-center">
-                      <div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-4 text-indigo-600">
-                          <KeyRound size={32} />
-                      </div>
-                      <h3 className="text-xl font-black text-gray-800 tamil-font">{t.resetPassword}</h3>
-                  </div>
-              )}
-  
-                <form onSubmit={mode === 'FORGOT_PASSWORD' ? handleForgotPassword : handleAuth} className="space-y-4">
+              <div className="flex gap-4 mb-8 bg-gray-100 p-1 rounded-2xl">
+                  <button onClick={() => setMode('LOGIN')} className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${mode === 'LOGIN' ? 'bg-white shadow-md text-indigo-600' : 'text-gray-400'}`}>Login</button>
+                  <button onClick={() => setMode('REGISTER')} className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${mode === 'REGISTER' ? 'bg-white shadow-md text-indigo-600' : 'text-gray-400'}`}>Sign Up</button>
+              </div>
+                <form onSubmit={handleAuth} className="space-y-4">
                   {mode === 'REGISTER' && (
-                      <>
-                      <div className="space-y-1">
-                          <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">{language === 'ta' ? 'பெயர்' : 'Name'}</label>
-                          <div className="relative">
-                              <UserSimple className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18}/>
-                              <input value={name} onChange={e => setName(e.target.value)} className="w-full bg-gray-50 p-4 pl-12 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100 transition" required />
-                          </div>
-                      </div>
-                      <div className="space-y-1">
-                          <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">{t.mobile}</label>
-                          <div className="relative">
-                              <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18}/>
-                              <input type="tel" value={mobile} onChange={e => setMobile(e.target.value)} className="w-full bg-gray-50 p-4 pl-12 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100 transition" required />
-                          </div>
-                      </div>
-                      </>
+                      <><input value={name} onChange={e => setName(e.target.value)} className="w-full bg-gray-50 p-4 rounded-2xl font-bold text-gray-700 outline-none" placeholder="Name" required />
+                      <input type="tel" value={mobile} onChange={e => setMobile(e.target.value)} className="w-full bg-gray-50 p-4 rounded-2xl font-bold text-gray-700 outline-none" placeholder="Mobile" required /></>
                   )}
-                  
-                  <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Email</label>
-                      <div className="relative">
-                          <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18}/>
-                          <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-gray-50 p-4 pl-12 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100 transition" required />
-                      </div>
+                  <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-gray-50 p-4 rounded-2xl font-bold text-gray-700 outline-none" placeholder="Email" required />
+                  <div className="relative">
+                      <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-gray-50 p-4 rounded-2xl font-bold text-gray-700 outline-none" placeholder="Password" required />
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">{showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}</button>
                   </div>
-                  
-                  {mode !== 'FORGOT_PASSWORD' && (
-                    <div className="space-y-1">
-                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">{language === 'ta' ? 'கடவுச்சொல்' : 'Password'}</label>
-                        <div className="relative">
-                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18}/>
-                        <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-gray-50 p-4 pl-12 pr-12 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100 transition" required />
-                        <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
-                            {showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}
-                        </button>
-                        </div>
-                    </div>
-                  )}
-                  
-                  {/* Forgot Password Link */}
-                  {mode === 'LOGIN' && (
-                      <div className="text-right">
-                          <button type="button" onClick={() => setMode('FORGOT_PASSWORD')} className="text-xs font-bold text-indigo-600 hover:text-indigo-800 tamil-font">
-                              {t.forgotPassword}
-                          </button>
-                      </div>
-                  )}
-  
                   <button disabled={isLoading} className="w-full bg-indigo-600 text-white p-4 rounded-2xl font-black shadow-lg shadow-indigo-200 mt-6 active:scale-95 transition flex justify-center hover:bg-indigo-700">
-                      {isLoading ? <Loader2 className="animate-spin" /> : (mode === 'LOGIN' ? (language === 'ta' ? 'உள்நுழைய' : 'Login') : mode === 'REGISTER' ? (language === 'ta' ? 'பதிவு செய்' : 'Register') : t.sendResetLink)}
+                      {isLoading ? <Loader2 className="animate-spin" /> : mode === 'LOGIN' ? 'Login' : 'Register'}
                   </button>
-
-                  {/* Back to Login for Forgot Password Mode */}
-                  {mode === 'FORGOT_PASSWORD' && (
-                      <button type="button" onClick={() => setMode('LOGIN')} className="w-full p-4 text-gray-500 font-bold text-sm hover:text-gray-700">
-                          {t.backToLogin}
-                      </button>
-                  )}
                 </form>
-  
-                {mode !== 'FORGOT_PASSWORD' && (
-                    <>
-                        <div className="mt-4 pt-2 border-t border-gray-100 text-center">
-                            <button onClick={handleSkipLogin} className="bg-indigo-50 text-indigo-600 rounded-xl font-bold text-sm hover:bg-indigo-100 transition flex items-center justify-center gap-2 w-full py-3">
-                                <UserX size={16} />
-                                {language === 'ta' ? 'விருந்தினராக தொடரவும் (Offline)' : 'Guest Login (Offline Mode)'}
-                            </button>
-                        </div>
-                        <div className="mt-2 pt-2 border-t border-gray-100">
-                            <label className="flex items-center justify-center gap-2 w-full p-4 border border-dashed border-gray-300 text-gray-400 rounded-2xl font-bold text-xs cursor-pointer hover:bg-gray-50 transition">
-                                <UploadCloud size={16} />
-                                <span>{language === 'ta' ? 'பழைய பேக்கப் ஃபைலை திறக்க' : 'Restore Local Backup File'}</span>
-                                <input type="file" onChange={handleFileRestore} accept=".json" className="hidden" />
-                            </label>
-                        </div>
-                        <div className="mt-2 text-center">
-                            <button onClick={() => setShowSetup(true)} className="text-[10px] text-gray-300 hover:text-indigo-500 font-bold uppercase tracking-widest transition">
-                                <Settings size={12} className="inline mr-1" /> 
-                                {language === 'ta' ? 'டேட்டாபேஸ் அமைக்க (Database Setup)' : 'Configure Database'}
-                            </button>
-                        </div>
-                    </>
-                )}
+                <div className="mt-4 pt-2 border-t border-gray-100 text-center">
+                    <button onClick={() => onLogin({ email: 'guest@viyabaari.local', name: 'Guest User', mobile: '0000000000', isLoggedIn: true })} className="bg-indigo-50 text-indigo-600 rounded-xl font-bold text-sm hover:bg-indigo-100 transition w-full py-3 flex items-center justify-center gap-2">
+                        <UserX size={16} /> Guest Login (Offline Mode)
+                    </button>
+                </div>
          </div>
       </div>
     );
