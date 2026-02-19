@@ -308,7 +308,7 @@ const App: React.FC = () => {
     if (!user) return;
     const emailKey = getEmailKey(user.email);
     
-    // Load local data immediately
+    // Immediate Local Load
     try {
         const localS = localStorage.getItem(`viyabaari_stocks_${emailKey}`);
         const localT = localStorage.getItem(`viyabaari_txns_${emailKey}`);
@@ -320,7 +320,7 @@ const App: React.FC = () => {
       if (isManualRefresh) setIsSyncing(true);
       try {
         // Force Fetch Stocks
-        const { data: sData } = await supabase.from('stock_items').select('content').eq('user_id', user.uid).order('last_updated', { ascending: false });
+        const { data: sData } = await supabase.from('stock_items').select('*').eq('user_id', user.uid).order('last_updated', { ascending: false });
         if (sData) {
           const freshS = sData.map((r: any) => {
               try { return typeof r.content === 'string' ? JSON.parse(r.content) : r.content; } catch(e) { return null; }
@@ -329,12 +329,8 @@ const App: React.FC = () => {
           localStorage.setItem(`viyabaari_stocks_${emailKey}`, JSON.stringify(freshS));
         }
 
-        // Force Fetch Transactions (Cache Bypass)
-        const { data: tData } = await supabase.from('transactions')
-          .select('content')
-          .eq('user_id', user.uid)
-          .order('date', { ascending: false }); // Ensures newest first from DB
-        
+        // Force Fetch Transactions
+        const { data: tData } = await supabase.from('transactions').select('*').eq('user_id', user.uid).order('date', { ascending: false });
         if (tData) {
           const freshT = tData.map((r: any) => {
               try { return typeof r.content === 'string' ? JSON.parse(r.content) : r.content; } catch(e) { return null; }
@@ -352,11 +348,11 @@ const App: React.FC = () => {
   const saveStock = async (itemData: any, id?: string) => {
     if (!user) return;
     setIsLoading(true);
+    const emailKey = getEmailKey(user.email);
     try {
         const newItem = { ...itemData, id: id || Date.now().toString(), lastUpdated: Date.now() };
-        const emailKey = getEmailKey(user.email);
         
-        // Immediate UI Update
+        // Immediate Optimistic Update
         setStocks(prev => {
           const updated = id ? prev.map(s => s.id === id ? newItem : s) : [newItem, ...prev];
           localStorage.setItem(`viyabaari_stocks_${emailKey}`, JSON.stringify(updated));
@@ -364,22 +360,39 @@ const App: React.FC = () => {
         });
 
         if (user.uid && isOnline && isSupabaseConfigured) {
-          await supabase.from('stock_items').upsert({ id: newItem.id, user_id: user.uid, content: newItem, last_updated: newItem.lastUpdated });
+          // Use .select() to ensure confirmed save
+          const { data, error } = await supabase.from('stock_items')
+            .upsert({ id: newItem.id, user_id: user.uid, content: newItem, last_updated: newItem.lastUpdated })
+            .select();
+          
+          if (error) throw error;
+          
+          // Double verify state with returned data if it's different
+          if (data && data[0]) {
+            const confirmedItem = typeof data[0].content === 'string' ? JSON.parse(data[0].content) : data[0].content;
+            setStocks(prev => prev.map(s => s.id === confirmedItem.id ? confirmedItem : s));
+          }
         }
-        setIsAddingStock(false); setEditingStock(null);
+        
+        setIsAddingStock(false); 
+        setEditingStock(null);
         setToast({ msg: language === 'ta' ? 'சரக்கு சேமிக்கப்பட்டது!' : 'Stock Saved!', show: true });
-    } catch (err) { setToast({ msg: 'Error saving stock', show: true, isError: true }); }
-    finally { setIsLoading(false); }
+    } catch (err) { 
+        console.error("Save stock failed:", err);
+        setToast({ msg: 'Error saving stock', show: true, isError: true }); 
+    } finally { 
+        setIsLoading(false); 
+    }
   };
 
   const saveTransaction = async (txnData: any, id?: string, date?: number) => {
     if (!user) return;
     setIsLoading(true);
+    const emailKey = getEmailKey(user.email);
     try {
         const newTxn = { ...txnData, id: id || Date.now().toString(), date: date || Date.now() };
-        const emailKey = getEmailKey(user.email);
         
-        // Immediate UI Update (Like Stocks)
+        // Immediate UI Update
         setTransactions(prev => {
           const updated = id ? prev.map(t => t.id === id ? newTxn : t) : [newTxn, ...prev];
           localStorage.setItem(`viyabaari_txns_${emailKey}`, JSON.stringify(updated));
@@ -387,22 +400,34 @@ const App: React.FC = () => {
         });
 
         if (user.uid && isOnline && isSupabaseConfigured) {
-          await supabase.from('transactions').upsert({ id: newTxn.id, user_id: user.uid, content: newTxn, date: newTxn.date });
+          const { data, error } = await supabase.from('transactions')
+            .upsert({ id: newTxn.id, user_id: user.uid, content: newTxn, date: newTxn.date })
+            .select();
+          
+          if (error) throw error;
+
+          if (data && data[0]) {
+             const confirmedTxn = typeof data[0].content === 'string' ? JSON.parse(data[0].content) : data[0].content;
+             setTransactions(prev => prev.map(t => t.id === confirmedTxn.id ? confirmedTxn : t));
+          }
         }
-        setIsAddingTransaction(false); setEditingTransaction(null);
+        
+        setIsAddingTransaction(false); 
+        setEditingTransaction(null);
         setToast({ msg: language === 'ta' ? 'கணக்கு சேமிக்கப்பட்டது!' : 'Entry Saved!', show: true });
-    } catch (err) { setToast({ msg: 'Error saving transaction', show: true, isError: true }); }
-    finally { setIsLoading(false); }
+    } catch (err) { 
+        console.error("Save transaction failed:", err);
+        setToast({ msg: 'Error saving transaction', show: true, isError: true }); 
+    } finally { 
+        setIsLoading(false); 
+    }
   };
 
   const handleClearTransactions = async () => {
     if (!user) return;
     const emailKey = getEmailKey(user.email);
-    
-    // Immediate UI Clear
     setTransactions([]);
     localStorage.setItem(`viyabaari_txns_${emailKey}`, '[]');
-    
     if (user.uid && isOnline && isSupabaseConfigured) {
        await supabase.from('transactions').delete().eq('user_id', user.uid);
     }
