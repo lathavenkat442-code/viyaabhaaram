@@ -56,6 +56,7 @@ interface SecurityAction {
 
 const EXPENSE_CATEGORIES = ['Salary', 'Rent', 'Tea/Snacks', 'Transport', 'Purchase', 'Sales', 'Electricity', 'Maintenance', 'Others'];
 
+// Modern Toast Notification Component
 const Toast: React.FC<{ message: string; show: boolean; onClose: () => void }> = ({ message, show, onClose }) => {
     useEffect(() => {
         if (show) {
@@ -67,10 +68,10 @@ const Toast: React.FC<{ message: string; show: boolean; onClose: () => void }> =
     if (!show) return null;
 
     return (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-top duration-300">
-            <div className="bg-green-600 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 border border-green-500/50 backdrop-blur-sm">
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-top duration-500">
+            <div className="bg-green-600 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 border border-green-500/50 backdrop-blur-md">
                 <CheckCircle2 size={20} className="text-green-100" />
-                <span className="font-bold text-sm tamil-font">{message}</span>
+                <span className="font-bold text-sm tamil-font whitespace-nowrap">{message}</span>
             </div>
         </div>
     );
@@ -714,32 +715,58 @@ const App: React.FC = () => {
     return () => subscription.unsubscribe();
   }, []);
 
+  // --- STALE-WHILE-REVALIDATE FETCH LOGIC ---
   const fetchData = useCallback(async (isManualRefresh = false) => {
       if (!user) return;
+
+      // 1. INSTANT LOAD: Load from LocalStorage immediately
       const savedStocks = localStorage.getItem(`viyabaari_stocks_${user.email}`);
       const savedTxns = localStorage.getItem(`viyabaari_txns_${user.email}`);
+      
       if (savedStocks) setStocks(JSON.parse(savedStocks));
       if (savedTxns) setTransactions(JSON.parse(savedTxns));
 
+      // 2. BACKGROUND REVALIDATE: If online, fetch fresh data from Supabase
       if (user.uid && isOnline) {
           if (isManualRefresh) setIsSyncing(true);
           try {
-              const { data: stockData, error: stockError } = await supabase.from('stock_items').select('content').eq('user_id', user.uid);
+              // Force Fetch Stocks
+              const { data: stockData, error: stockError } = await supabase
+                .from('stock_items')
+                .select('content')
+                .eq('user_id', user.uid);
+              
               if (!stockError && stockData) {
-                  const cloudStocks = stockData.map((row: any) => typeof row.content === 'string' ? JSON.parse(row.content) : row.content);
+                  const cloudStocks = stockData.map((row: any) => 
+                      typeof row.content === 'string' ? JSON.parse(row.content) : row.content
+                  );
                   cloudStocks.sort((a: StockItem, b: StockItem) => (b.lastUpdated || 0) - (a.lastUpdated || 0));
+                  
+                  // Update UI & Cache only if changed (simple check)
                   setStocks(cloudStocks);
                   localStorage.setItem(`viyabaari_stocks_${user.email}`, JSON.stringify(cloudStocks));
               }
-              const { data: txnData, error: txnError } = await supabase.from('transactions').select('content').eq('user_id', user.uid);
+
+              // Force Fetch Transactions
+              const { data: txnData, error: txnError } = await supabase
+                .from('transactions')
+                .select('content')
+                .eq('user_id', user.uid);
+
               if (!txnError && txnData) {
-                  const cloudTxns = txnData.map((row: any) => typeof row.content === 'string' ? JSON.parse(row.content) : row.content);
+                  const cloudTxns = txnData.map((row: any) => 
+                      typeof row.content === 'string' ? JSON.parse(row.content) : row.content
+                  );
                   cloudTxns.sort((a: Transaction, b: Transaction) => (b.date || 0) - (a.date || 0));
+                  
                   setTransactions(cloudTxns);
                   localStorage.setItem(`viyabaari_txns_${user.email}`, JSON.stringify(cloudTxns));
               }
-          } catch (err) { console.error(err); }
-          finally { if (isManualRefresh) setTimeout(() => setIsSyncing(false), 500); }
+          } catch (err) { 
+              console.error("Cloud Fetch Error:", err); 
+          } finally { 
+              if (isManualRefresh) setTimeout(() => setIsSyncing(false), 500); 
+          }
       }
   }, [user, isOnline]);
 
@@ -756,6 +783,7 @@ const App: React.FC = () => {
     }
   }, [fetchData, user?.uid, isOnline]);
 
+  // --- AUTOMATIC SAVE WITH POPUP ---
   const saveStock = async (itemData: Omit<StockItem, 'id' | 'lastUpdated' | 'history'>, id?: string) => {
     setIsLoading(true);
     const sanitizedVariants = itemData.variants.map(v => ({ ...v, sizeStocks: v.sizeStocks || [{ size: 'General', quantity: 0 }] }));
@@ -775,23 +803,56 @@ const App: React.FC = () => {
         if (oldQty !== newQty) { const diff = newQty - oldQty; const sign = diff > 0 ? '+' : ''; newHistory.unshift({ date: Date.now(), action: 'STOCK_CHANGE', description: 'Stock Quantity Updated', change: `${oldQty} ➔ ${newQty} (${sign}${diff})` }); actionAdded = true; }
         if (!actionAdded && (existingItem.name !== itemData.name || existingItem.category !== itemData.category)) newHistory.unshift({ date: Date.now(), action: 'UPDATED', description: 'Item Details Updated' });
         newItem = { ...itemData, variants: sanitizedVariants, id, lastUpdated: Date.now(), history: newHistory };
-        setStocks(prev => prev.map(s => s.id === id ? newItem : s));
     } else {
         const initialQty = sanitizedVariants.reduce((acc, v) => acc + v.sizeStocks.reduce((sum, ss) => sum + ss.quantity, 0), 0);
         newItem = { ...itemData, variants: sanitizedVariants, id: Date.now().toString(), lastUpdated: Date.now(), history: [{ date: Date.now(), action: 'CREATED', description: 'Item Created', change: `Initial Stock: ${initialQty}` }] };
-        setStocks(prev => [newItem, ...prev]);
     }
 
-    if (user?.uid && isOnline) await supabase.from('stock_items').upsert({ id: newItem.id, user_id: user.uid, content: newItem, last_updated: newItem.lastUpdated });
-    if (user?.email) {
-        const updatedStocks = id ? stocks.map(s => s.id === id ? newItem : s) : [newItem, ...stocks];
-        localStorage.setItem(`viyabaari_stocks_${user.email}`, JSON.stringify(updatedStocks));
+    // 1. UPDATE UI IMMEDIATELY
+    setStocks(prev => {
+        const updated = id ? prev.map(s => s.id === id ? newItem : s) : [newItem, ...prev];
+        if (user?.email) localStorage.setItem(`viyabaari_stocks_${user.email}`, JSON.stringify(updated));
+        return updated;
+    });
+
+    // 2. BACKGROUND SAVE TO SUPABASE
+    if (user?.uid && isOnline) {
+        await supabase.from('stock_items').upsert({ id: newItem.id, user_id: user.uid, content: newItem, last_updated: newItem.lastUpdated });
     }
 
     setIsLoading(false);
     setIsAddingStock(false);
     setEditingStock(null);
-    setToastMessage(language === 'ta' ? 'வெற்றிகரமாக சேமிக்கப்பட்டது!' : 'Saved Successfully!');
+    
+    // 3. SHOW POPUP
+    setToastMessage(language === 'ta' ? 'சரக்கு வெற்றிகரமாக சேமிக்கப்பட்டது!' : 'Stock Saved Successfully!');
+    setShowToast(true);
+  };
+
+  const saveTransaction = async (txnData: Omit<Transaction, 'id' | 'date'>, id?: string, date?: number) => {
+    setIsLoading(true);
+    let newTxn: Transaction;
+    if (id && date) { newTxn = { ...txnData, id, date }; }
+    else { newTxn = { ...txnData, id: Date.now().toString(), date: Date.now() }; }
+
+    // 1. UPDATE UI IMMEDIATELY
+    setTransactions(prev => {
+        const updated = id ? prev.map(t => t.id === id ? newTxn : t) : [newTxn, ...prev];
+        if (user?.email) localStorage.setItem(`viyabaari_txns_${user.email}`, JSON.stringify(updated));
+        return updated;
+    });
+
+    // 2. BACKGROUND SAVE TO SUPABASE
+    if (user?.uid && isOnline) {
+        await supabase.from('transactions').upsert({ id: newTxn.id, user_id: user.uid, content: newTxn, date: newTxn.date });
+    }
+
+    setIsLoading(false);
+    setIsAddingTransaction(false);
+    setEditingTransaction(null);
+    
+    // 3. SHOW POPUP
+    setToastMessage(language === 'ta' ? 'கணக்கு வெற்றிகரமாக சேமிக்கப்பட்டது!' : 'Transaction Saved Successfully!');
     setShowToast(true);
   };
 
@@ -818,30 +879,13 @@ const App: React.FC = () => {
      setSecurityOtp('');
   };
 
-  const saveTransaction = async (txnData: Omit<Transaction, 'id' | 'date'>, id?: string, date?: number) => {
-    setIsLoading(true);
-    let newTxn: Transaction;
-    if (id && date) { newTxn = { ...txnData, id, date }; setTransactions(prev => prev.map(t => t.id === id ? newTxn : t)); }
-    else { newTxn = { ...txnData, id: Date.now().toString(), date: Date.now() }; setTransactions(prev => [newTxn, ...prev]); }
-    if (user?.uid && isOnline) await supabase.from('transactions').upsert({ id: newTxn.id, user_id: user.uid, content: newTxn, date: newTxn.date });
-    if (user?.email) {
-        const updatedTxns = id ? transactions.map(t => t.id === id ? newTxn : t) : [newTxn, ...transactions];
-        localStorage.setItem(`viyabaari_txns_${user.email}`, JSON.stringify(updatedTxns));
-    }
-    setIsLoading(false);
-    setIsAddingTransaction(false);
-    setEditingTransaction(null);
-    setToastMessage(language === 'ta' ? 'வெற்றிகரமாக சேமிக்கப்பட்டது!' : 'Saved Successfully!');
-    setShowToast(true);
-  };
-
   const handleManualPush = async () => {
       if(!user?.uid || !isOnline) { alert(language === 'ta' ? 'இணைய இணைப்பு தேவை' : 'Online connection required'); return; }
       setIsSyncing(true);
       for(const s of stocks) await supabase.from('stock_items').upsert({ id: s.id, user_id: user.uid, content: s, last_updated: s.lastUpdated });
       for(const t of transactions) await supabase.from('transactions').upsert({ id: t.id, user_id: user.uid, content: t, date: t.date });
       setIsSyncing(false);
-      setToastMessage(language === 'ta' ? 'ஆன்லைனில் சேமிக்கப்பட்டது!' : 'Synced to Cloud!');
+      setToastMessage(language === 'ta' ? 'கிளவுட் சிங்க் முடிந்தது!' : 'Synced to Cloud!');
       setShowToast(true);
   };
 
@@ -858,6 +902,7 @@ const App: React.FC = () => {
 
   return (
     <div className="max-w-md mx-auto min-h-screen bg-slate-50 flex flex-col shadow-xl">
+      {/* Toast Popups are rendered here */}
       <Toast message={toastMessage} show={showToast} onClose={() => setShowToast(false)} />
 
       {showInstallBanner && (
