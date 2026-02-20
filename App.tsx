@@ -320,23 +320,26 @@ const App: React.FC = () => {
       if (isManualRefresh) setIsSyncing(true);
       try {
         // Force Fetch Stocks
-        const { data: sData } = await supabase.from('stock_items').select('*').eq('user_id', user.uid).order('last_updated', { ascending: false });
+        const { data: sData, error: sError } = await supabase.from('stock_items').select('*').eq('user_id', user.uid).order('last_updated', { ascending: false });
+        if (sError) console.error("Fetch stocks error:", sError);
         if (sData) {
           const freshS = sData.map((r: any) => {
               try { return typeof r.content === 'string' ? JSON.parse(r.content) : r.content; } catch(e) { return null; }
           }).filter(Boolean);
           setStocks(freshS);
-          localStorage.setItem(`viyabaari_stocks_${emailKey}`, JSON.stringify(freshS));
+          try { localStorage.setItem(`viyabaari_stocks_${emailKey}`, JSON.stringify(freshS)); } catch(e) {}
         }
 
         // Force Fetch Transactions
-        const { data: tData } = await supabase.from('transactions').select('*').eq('user_id', user.uid).order('date', { ascending: false });
+        const { data: tData, error: tError } = await supabase.from('transactions').select('*').eq('user_id', user.uid);
+        if (tError) console.error("Fetch txns error:", tError);
         if (tData) {
           const freshT = tData.map((r: any) => {
               try { return typeof r.content === 'string' ? JSON.parse(r.content) : r.content; } catch(e) { return null; }
           }).filter(Boolean);
+          freshT.sort((a: any, b: any) => (b.date || 0) - (a.date || 0));
           setTransactions(freshT);
-          localStorage.setItem(`viyabaari_txns_${emailKey}`, JSON.stringify(freshT));
+          try { localStorage.setItem(`viyabaari_txns_${emailKey}`, JSON.stringify(freshT)); } catch(e) {}
         }
       } catch (e) { console.error("Cloud fetch failed", e); }
       finally { if (isManualRefresh) setIsSyncing(false); }
@@ -355,7 +358,7 @@ const App: React.FC = () => {
         // Immediate Optimistic Update
         setStocks(prev => {
           const updated = id ? prev.map(s => s.id === id ? newItem : s) : [newItem, ...prev];
-          localStorage.setItem(`viyabaari_stocks_${emailKey}`, JSON.stringify(updated));
+          try { localStorage.setItem(`viyabaari_stocks_${emailKey}`, JSON.stringify(updated)); } catch(e) { console.warn("LocalStorage quota exceeded"); }
           return updated;
         });
 
@@ -368,9 +371,15 @@ const App: React.FC = () => {
           if (error) throw error;
           
           // Double verify state with returned data if it's different
-          if (data && data[0]) {
-            const confirmedItem = typeof data[0].content === 'string' ? JSON.parse(data[0].content) : data[0].content;
-            setStocks(prev => prev.map(s => s.id === confirmedItem.id ? confirmedItem : s));
+          if (data && data[0] && data[0].content) {
+            try {
+              const confirmedItem = typeof data[0].content === 'string' ? JSON.parse(data[0].content) : data[0].content;
+              if (confirmedItem && confirmedItem.id) {
+                setStocks(prev => prev.map(s => s.id === confirmedItem.id ? confirmedItem : s));
+              }
+            } catch (e) {
+              console.error("Error parsing confirmed item", e);
+            }
           }
         }
         
@@ -395,20 +404,26 @@ const App: React.FC = () => {
         // Immediate UI Update
         setTransactions(prev => {
           const updated = id ? prev.map(t => t.id === id ? newTxn : t) : [newTxn, ...prev];
-          localStorage.setItem(`viyabaari_txns_${emailKey}`, JSON.stringify(updated));
+          try { localStorage.setItem(`viyabaari_txns_${emailKey}`, JSON.stringify(updated)); } catch(e) { console.warn("LocalStorage quota exceeded"); }
           return updated;
         });
 
         if (user.uid && isOnline && isSupabaseConfigured) {
           const { data, error } = await supabase.from('transactions')
-            .upsert({ id: newTxn.id, user_id: user.uid, content: newTxn, date: newTxn.date })
+            .upsert({ id: newTxn.id, user_id: user.uid, content: newTxn })
             .select();
           
           if (error) throw error;
 
-          if (data && data[0]) {
-             const confirmedTxn = typeof data[0].content === 'string' ? JSON.parse(data[0].content) : data[0].content;
-             setTransactions(prev => prev.map(t => t.id === confirmedTxn.id ? confirmedTxn : t));
+          if (data && data[0] && data[0].content) {
+             try {
+               const confirmedTxn = typeof data[0].content === 'string' ? JSON.parse(data[0].content) : data[0].content;
+               if (confirmedTxn && confirmedTxn.id) {
+                 setTransactions(prev => prev.map(t => t.id === confirmedTxn.id ? confirmedTxn : t));
+               }
+             } catch (e) {
+               console.error("Error parsing confirmed txn", e);
+             }
           }
         }
         
@@ -427,7 +442,7 @@ const App: React.FC = () => {
     if (!user) return;
     const emailKey = getEmailKey(user.email);
     setTransactions([]);
-    localStorage.setItem(`viyabaari_txns_${emailKey}`, '[]');
+    try { localStorage.setItem(`viyabaari_txns_${emailKey}`, '[]'); } catch(e) {}
     if (user.uid && isOnline && isSupabaseConfigured) {
        await supabase.from('transactions').delete().eq('user_id', user.uid);
     }
