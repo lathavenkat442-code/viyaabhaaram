@@ -188,6 +188,17 @@ const AddStockModal: React.FC<{ onSave: (item: any, id?: string) => void; onClos
              
              {currentVariant && (
                 <div className="space-y-6 mt-4">
+                   {variants.length > 1 && (
+                       <div className="flex justify-end">
+                           <button type="button" onClick={() => {
+                               const newVariants = variants.filter((_, i) => i !== activeVariantIndex);
+                               setVariants(newVariants);
+                               setActiveVariantIndex(Math.max(0, activeVariantIndex - 1));
+                           }} className="text-red-500 text-xs font-bold flex items-center gap-1 bg-red-50 px-3 py-2 rounded-xl hover:bg-red-100 transition">
+                               <Trash2 size={14} /> {language === 'ta' ? 'இந்த வகையை நீக்கு' : 'Delete Variant'}
+                           </button>
+                       </div>
+                   )}
                    <div className="relative aspect-video bg-white rounded-3xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center overflow-hidden group">
                       {currentVariant.imageUrl ? (
                         <><img src={currentVariant.imageUrl} className="w-full h-full object-contain" alt="" />
@@ -438,6 +449,34 @@ const App: React.FC = () => {
     }
   };
 
+  const handleDeleteStock = async (id: string) => {
+    const confirmMsg = language === 'ta' ? 'நிச்சயமாக இதை நீக்க வேண்டுமா?' : 'Are you sure you want to delete?';
+    if (!window.confirm(confirmMsg)) return false;
+    
+    if (!user) return false;
+    setIsLoading(true);
+    const emailKey = getEmailKey(user.email);
+    try {
+        setStocks(prev => {
+            const updated = prev.filter(s => s.id !== id);
+            try { localStorage.setItem(`viyabaari_stocks_${emailKey}`, JSON.stringify(updated)); } catch(e) {}
+            return updated;
+        });
+
+        if (user.uid && isOnline && isSupabaseConfigured) {
+            await supabase.from('stock_items').delete().eq('id', id).eq('user_id', user.uid);
+        }
+        setToast({ msg: language === 'ta' ? 'பொருள் நீக்கப்பட்டது!' : 'Item Deleted!', show: true });
+        return true;
+    } catch (err) {
+        console.error("Delete stock failed:", err);
+        setToast({ msg: 'Error deleting stock', show: true, isError: true });
+        return false;
+    } finally {
+        setIsLoading(false);
+    }
+  };
+
   const handleClearTransactions = async () => {
     if (!user) return;
     const emailKey = getEmailKey(user.email);
@@ -465,7 +504,7 @@ const App: React.FC = () => {
       </header>
       <main className="flex-1 overflow-y-auto pb-24">
         {activeTab === 'dashboard' && <Dashboard stocks={stocks} transactions={transactions} language={language} user={user} onSetupServer={() => setShowDatabaseConfig(true)} />}
-        {activeTab === 'stock' && <Inventory stocks={stocks} onDelete={id => {}} onEdit={s => { setEditingStock(s); setIsAddingStock(true); }} language={language} />}
+        {activeTab === 'stock' && <Inventory stocks={stocks} onDelete={handleDeleteStock} onEdit={s => { setEditingStock(s); setIsAddingStock(true); }} language={language} />}
         {activeTab === 'accounts' && <Accounting transactions={transactions} language={language} onEdit={t => { setEditingTransaction(t); setIsAddingTransaction(true); }} onClear={handleClearTransactions} />}
         {activeTab === 'profile' && <Profile user={user} updateUser={setUser} stocks={stocks} transactions={transactions} onLogout={() => { supabase.auth.signOut(); setUser(null); localStorage.removeItem('viyabaari_active_user'); window.location.reload(); }} onRestore={d => {}} language={language} onLanguageChange={(l) => { setLanguage(l); localStorage.setItem('viyabaari_lang', l); }} onClearTransactions={handleClearTransactions} onResetApp={() => {}} onSetupServer={() => setShowDatabaseConfig(true)} />}
       </main>

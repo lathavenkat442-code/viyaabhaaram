@@ -378,7 +378,7 @@ const InventoryCard: React.FC<{ item: StockItem; onClick: () => void; onDelete: 
     );
 }
 
-const Inventory: React.FC<{ stocks: StockItem[]; onDelete: (id: string) => void; onEdit: (item: StockItem) => void; language: 'ta' | 'en' }> = ({ stocks, onDelete, onEdit, language }) => {
+const Inventory: React.FC<{ stocks: StockItem[]; onDelete: (id: string) => Promise<boolean> | void; onEdit: (item: StockItem) => void; language: 'ta' | 'en' }> = ({ stocks, onDelete, onEdit, language }) => {
   const [search, setSearch] = useState('');
   const [filterLowStock, setFilterLowStock] = useState(false);
   const [viewingItem, setViewingItem] = useState<StockItem | null>(null);
@@ -489,7 +489,12 @@ const Inventory: React.FC<{ stocks: StockItem[]; onDelete: (id: string) => void;
              item={viewingItem} 
              onClose={() => setViewingItem(null)}
              onEdit={() => { setViewingItem(null); onEdit(viewingItem); }}
-             onDelete={() => { setViewingItem(null); onDelete(viewingItem.id); }}
+             onDelete={async () => { 
+                 const success = await onDelete(viewingItem.id);
+                 if (success !== false) {
+                     setViewingItem(null); 
+                 }
+             }}
              onShare={() => handleShare(viewingItem)}
              language={language}
           />
