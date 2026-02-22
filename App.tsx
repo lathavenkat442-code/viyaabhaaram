@@ -348,6 +348,11 @@ const App: React.FC = () => {
         if (savedUser) { try { setUser(JSON.parse(savedUser)); } catch(e) { localStorage.removeItem('viyabaari_active_user'); } }
       }
       setIsAppLoading(false);
+    }).catch(err => {
+      console.error("Session check failed", err);
+      const savedUser = localStorage.getItem('viyabaari_active_user');
+      if (savedUser) { try { setUser(JSON.parse(savedUser)); } catch(e) {} }
+      setIsAppLoading(false);
     });
   }, []);
 
@@ -547,9 +552,9 @@ const App: React.FC = () => {
   return (
     <div className="max-w-md mx-auto min-h-screen bg-slate-50 flex flex-col shadow-xl">
       <Toast message={toast.msg} show={toast.show} isError={toast.isError} onClose={() => setToast({ ...toast, show: false })} />
-      <header className="bg-indigo-600 text-white p-4 sticky top-0 z-10 shadow-md flex flex-wrap gap-2 justify-between items-center">
-        <div className="flex items-center gap-2"><h1 className="text-xl font-bold tamil-font truncate">{t.appName}</h1></div>
-        <div className="flex gap-3 items-center">
+      <header className="bg-indigo-600 text-white p-3 sm:p-4 sticky top-0 z-10 shadow-md flex flex-wrap gap-2 justify-between items-center">
+        <div className="flex items-center gap-2"><h1 className="text-lg sm:text-xl font-bold tamil-font truncate">{t.appName}</h1></div>
+        <div className="flex gap-2 items-center">
             {isOnline && user.uid && <button onClick={() => fetchData(true)} className={`p-2 bg-white/10 hover:bg-white/20 rounded-full transition ${isSyncing ? 'animate-spin' : ''}`}><RefreshCw size={20} /></button>}
             <button onClick={() => { setEditingStock(null); setIsAddingStock(true); }} className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition"><PlusCircle size={20}/></button>
             <button onClick={() => { setEditingTransaction(null); setIsAddingTransaction(true); }} className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition"><ArrowLeftRight size={20}/></button>
@@ -561,12 +566,9 @@ const App: React.FC = () => {
         {activeTab === 'accounts' && <Accounting transactions={transactions} language={language} onEdit={t => { setEditingTransaction(t); setIsAddingTransaction(true); }} onClear={handleClearTransactions} />}
         {activeTab === 'profile' && <Profile user={user} updateUser={setUser} stocks={stocks} transactions={transactions} onLogout={async () => { 
             await supabase.auth.signOut(); 
-            setUser(null); 
-            localStorage.removeItem('viyabaari_active_user'); 
-            // Clear any other session data if needed
+            localStorage.clear();
             sessionStorage.clear();
-            // Force reload to clear any in-memory state
-            window.location.reload(); 
+            setUser(null); 
         }} onRestore={d => {}} language={language} onLanguageChange={(l) => { setLanguage(l); localStorage.setItem('viyabaari_lang', l); }} onClearTransactions={handleClearTransactions} onResetApp={() => {}} onSetupServer={() => setShowDatabaseConfig(true)} />}
       </main>
       {showDatabaseConfig && <DatabaseConfigModal onClose={() => setShowDatabaseConfig(false)} language={language} />}
