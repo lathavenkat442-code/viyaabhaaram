@@ -296,6 +296,7 @@ const App: React.FC = () => {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [showDatabaseConfig, setShowDatabaseConfig] = useState(false);
   const [toast, setToast] = useState<{ msg: string, show: boolean, isError?: boolean }>({ msg: '', show: false });
+  const [isAppLoading, setIsAppLoading] = useState(true);
 
   const getEmailKey = (email: string) => (email || 'guest').toLowerCase().replace(/[^a-z0-9]/g, '_');
 
@@ -312,6 +313,7 @@ const App: React.FC = () => {
         const savedUser = localStorage.getItem('viyabaari_active_user');
         if (savedUser) { try { setUser(JSON.parse(savedUser)); } catch(e) { localStorage.removeItem('viyabaari_active_user'); } }
       }
+      setIsAppLoading(false);
     });
   }, []);
 
@@ -330,6 +332,14 @@ const App: React.FC = () => {
     if (user.uid && isOnline && isSupabaseConfigured) {
       if (isManualRefresh) setIsSyncing(true);
       try {
+        // Verify session before fetching to prevent RLS issues wiping data
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session || session.user.id !== user.uid) {
+            console.warn("Session mismatch or expired. Skipping cloud fetch.");
+            if (isManualRefresh) alert("Session expired. Please logout and login again.");
+            return; 
+        }
+
         // Force Fetch Stocks
         const { data: sData, error: sError } = await supabase.from('stock_items').select('*').eq('user_id', user.uid).order('last_updated', { ascending: false });
         if (sError) console.error("Fetch stocks error:", sError);
@@ -489,17 +499,27 @@ const App: React.FC = () => {
   };
 
   const t = TRANSLATIONS[language];
+  
+  if (isAppLoading) {
+      return (
+          <div className="min-h-screen bg-indigo-600 flex flex-col items-center justify-center text-white">
+              <Loader2 size={48} className="animate-spin mb-4" />
+              <h1 className="text-2xl font-black tamil-font animate-pulse">Viyabaari Loading...</h1>
+          </div>
+      );
+  }
+
   if (!user) return <AuthScreen onLogin={u => { setUser(u); localStorage.setItem('viyabaari_active_user', JSON.stringify(u)); window.location.reload(); }} language={language} t={t} isOnline={isOnline} />;
 
   return (
     <div className="max-w-md mx-auto min-h-screen bg-slate-50 flex flex-col shadow-xl">
       <Toast message={toast.msg} show={toast.show} isError={toast.isError} onClose={() => setToast({ ...toast, show: false })} />
-      <header className="bg-indigo-600 text-white p-4 sticky top-0 z-10 shadow-md flex justify-between items-center">
-        <div className="flex items-center gap-2"><h1 className="text-xl font-bold tamil-font">{t.appName}</h1></div>
-        <div className="flex gap-4">
-            {isOnline && user.uid && <button onClick={() => fetchData(true)} className={`p-1 rounded-full ${isSyncing ? 'animate-spin' : ''}`}><RefreshCw size={22} /></button>}
-            <button onClick={() => { setEditingStock(null); setIsAddingStock(true); }} className="p-1 rounded-full"><PlusCircle size={22}/></button>
-            <button onClick={() => { setEditingTransaction(null); setIsAddingTransaction(true); }} className="p-1 rounded-full"><ArrowLeftRight size={22}/></button>
+      <header className="bg-indigo-600 text-white p-4 sticky top-0 z-10 shadow-md flex flex-wrap gap-2 justify-between items-center">
+        <div className="flex items-center gap-2"><h1 className="text-xl font-bold tamil-font truncate">{t.appName}</h1></div>
+        <div className="flex gap-3 items-center">
+            {isOnline && user.uid && <button onClick={() => fetchData(true)} className={`p-2 bg-white/10 hover:bg-white/20 rounded-full transition ${isSyncing ? 'animate-spin' : ''}`}><RefreshCw size={20} /></button>}
+            <button onClick={() => { setEditingStock(null); setIsAddingStock(true); }} className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition"><PlusCircle size={20}/></button>
+            <button onClick={() => { setEditingTransaction(null); setIsAddingTransaction(true); }} className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition"><ArrowLeftRight size={20}/></button>
         </div>
       </header>
       <main className="flex-1 overflow-y-auto pb-24">
@@ -519,11 +539,11 @@ const App: React.FC = () => {
       {showDatabaseConfig && <DatabaseConfigModal onClose={() => setShowDatabaseConfig(false)} language={language} />}
       {isAddingStock && <AddStockModal onSave={saveStock} onClose={() => setIsAddingStock(false)} initialData={editingStock || undefined} language={language} t={t} />}
       {isAddingTransaction && <AddTransactionModal onSave={saveTransaction} onClose={() => setIsAddingTransaction(false)} initialData={editingTransaction || undefined} language={language} t={t} />}
-      <nav className="bg-white border-t fixed bottom-0 w-full max-w-md flex justify-around p-3 z-10">
-        <button onClick={() => setActiveTab('dashboard')} className={`flex flex-col items-center ${activeTab === 'dashboard' ? 'text-indigo-600' : 'text-gray-400'}`}><LayoutDashboard size={24} /><span className="text-[10px] tamil-font">{t.dashboard}</span></button>
-        <button onClick={() => setActiveTab('stock')} className={`flex flex-col items-center ${activeTab === 'stock' ? 'text-indigo-600' : 'text-gray-400'}`}><Package size={24} /><span className="text-[10px] tamil-font">{t.stock}</span></button>
-        <button onClick={() => setActiveTab('accounts')} className={`flex flex-col items-center ${activeTab === 'accounts' ? 'text-indigo-600' : 'text-gray-400'}`}><ArrowLeftRight size={24} /><span className="text-[10px] tamil-font">{t.accounts}</span></button>
-        <button onClick={() => setActiveTab('profile')} className={`flex flex-col items-center ${activeTab === 'profile' ? 'text-indigo-600' : 'text-gray-400'}`}><UserIcon size={24} /><span className="text-[10px] tamil-font">{t.profile}</span></button>
+      <nav className="bg-indigo-600 border-t border-indigo-500 fixed bottom-0 w-full max-w-md flex justify-around p-3 z-10 text-white">
+        <button onClick={() => setActiveTab('dashboard')} className={`flex flex-col items-center transition ${activeTab === 'dashboard' ? 'opacity-100 scale-110' : 'opacity-60 hover:opacity-80'}`}><LayoutDashboard size={24} /><span className="text-[10px] tamil-font mt-1">{t.dashboard}</span></button>
+        <button onClick={() => setActiveTab('stock')} className={`flex flex-col items-center transition ${activeTab === 'stock' ? 'opacity-100 scale-110' : 'opacity-60 hover:opacity-80'}`}><Package size={24} /><span className="text-[10px] tamil-font mt-1">{t.stock}</span></button>
+        <button onClick={() => setActiveTab('accounts')} className={`flex flex-col items-center transition ${activeTab === 'accounts' ? 'opacity-100 scale-110' : 'opacity-60 hover:opacity-80'}`}><ArrowLeftRight size={24} /><span className="text-[10px] tamil-font mt-1">{t.accounts}</span></button>
+        <button onClick={() => setActiveTab('profile')} className={`flex flex-col items-center transition ${activeTab === 'profile' ? 'opacity-100 scale-110' : 'opacity-60 hover:opacity-80'}`}><UserIcon size={24} /><span className="text-[10px] tamil-font mt-1">{t.profile}</span></button>
       </nav>
       {isLoading && <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-[110] backdrop-blur-[1px]"><div className="bg-white p-6 rounded-3xl shadow-2xl flex flex-col items-center gap-4 animate-in zoom-in duration-300"><Loader2 className="animate-spin text-indigo-600" size={40}/><p className="font-black text-gray-800 tamil-font">சேமிக்கப்படுகிறது...</p></div></div>}
     </div>

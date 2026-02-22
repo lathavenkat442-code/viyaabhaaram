@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { StockItem, StockVariant } from '../types';
-import { Search, Trash2, Filter, Edit2, Package, AlertTriangle, Share2, X, ChevronLeft, ChevronRight, Info, History } from 'lucide-react';
+import { Search, Trash2, Filter, Edit2, Package, AlertTriangle, Share2, X, ChevronLeft, ChevronRight, Info, History, LayoutGrid, List } from 'lucide-react';
 import { TRANSLATIONS } from '../constants';
 
 const getTamilHistoryDescription = (desc: string) => {
@@ -221,7 +221,7 @@ const StockDetailView: React.FC<{ item: StockItem; onClose: () => void; onEdit: 
     );
 };
 
-const InventoryCard: React.FC<{ item: StockItem; onClick: () => void; onDelete: () => void; onEdit: () => void; onShare: () => void; language: 'ta' | 'en' }> = ({ item, onClick, onDelete, onEdit, onShare, language }) => {
+const InventoryCard: React.FC<{ item: StockItem; onClick: () => void; onDelete: () => void; onEdit: () => void; onShare: () => void; language: 'ta' | 'en'; viewMode: 'grid' | 'list' }> = ({ item, onClick, onDelete, onEdit, onShare, language, viewMode }) => {
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -265,6 +265,46 @@ const InventoryCard: React.FC<{ item: StockItem; onClick: () => void; onDelete: 
         if (sleeve === 'Half Hand') return language === 'ta' ? 'அரை' : 'Half';
         return '';
     };
+
+    if (viewMode === 'list') {
+        return (
+            <div 
+                onClick={onClick}
+                className={`bg-white rounded-2xl shadow-sm overflow-hidden border flex items-center p-3 gap-4 transition-transform active:scale-[0.98] cursor-pointer ${isLow ? 'border-red-100 ring-1 ring-red-50' : 'border-gray-100'}`}
+            >
+                <div className="w-20 h-20 bg-slate-50 rounded-xl flex-shrink-0 relative overflow-hidden">
+                    {activeVariant?.imageUrl ? (
+                        <img src={activeVariant.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                    ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-300"><Package size={24} /></div>
+                    )}
+                    {isLow && <div className="absolute top-1 left-1 bg-red-500 w-2 h-2 rounded-full shadow-sm animate-pulse" />}
+                </div>
+                
+                <div className="flex-1 min-w-0">
+                    <div className="flex justify-between items-start mb-1">
+                        <div>
+                            <h4 className="font-bold text-gray-800 text-sm truncate">{item.name}</h4>
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{item.category}</p>
+                        </div>
+                        <p className="text-sm font-black text-gray-900 bg-gray-50 px-2 py-0.5 rounded-lg">₹{item.price}</p>
+                    </div>
+                    
+                    <div className="flex items-center justify-between mt-2">
+                        <div className="flex gap-2 text-[10px] text-gray-500">
+                             <span className="bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">
+                                {variants.length} {language === 'ta' ? 'வகைகள்' : 'Variants'}
+                             </span>
+                        </div>
+                        <div className="flex flex-col items-end">
+                             <span className="text-[8px] text-gray-400 font-black uppercase">{language === 'ta' ? 'மொத்தம்' : 'Total'}</span>
+                             <span className={`font-black text-sm leading-none ${isLow ? 'text-red-500' : 'text-indigo-600'}`}>{totalQty}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div 
@@ -382,6 +422,7 @@ const Inventory: React.FC<{ stocks: StockItem[]; onDelete: (id: string) => Promi
   const [search, setSearch] = useState('');
   const [filterLowStock, setFilterLowStock] = useState(false);
   const [viewingItem, setViewingItem] = useState<StockItem | null>(null);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const t = TRANSLATIONS[language];
 
   const filtered = useMemo(() => {
@@ -457,12 +498,15 @@ const Inventory: React.FC<{ stocks: StockItem[]; onDelete: (id: string) => Promi
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={language === 'ta' ? 'சரக்கு தேடவும்...' : 'Search items...'} className="w-full pl-11 p-4 bg-white border border-gray-200 rounded-2xl outline-none shadow-sm focus:border-indigo-400 text-slate-900" />
         </div>
+        <button onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')} className="p-4 rounded-2xl border bg-white text-gray-500 border-gray-200 hover:bg-gray-50">
+          {viewMode === 'grid' ? <List size={18} /> : <LayoutGrid size={18} />}
+        </button>
         <button onClick={() => setFilterLowStock(!filterLowStock)} className={`p-4 rounded-2xl border transition-all ${filterLowStock ? 'bg-red-500 text-white border-red-500 shadow-lg' : 'bg-white text-gray-500 border-gray-200'}`}>
           <Filter size={18} />
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className={viewMode === 'grid' ? "grid grid-cols-2 gap-4" : "flex flex-col gap-3"}>
         {filtered.map(item => (
             <InventoryCard 
                 key={item.id} 
@@ -472,6 +516,7 @@ const Inventory: React.FC<{ stocks: StockItem[]; onDelete: (id: string) => Promi
                 onEdit={() => onEdit(item)}
                 onShare={() => handleShare(item)}
                 language={language}
+                viewMode={viewMode}
             />
         ))}
       </div>

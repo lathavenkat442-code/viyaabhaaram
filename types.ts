@@ -51,6 +51,7 @@ export interface User {
   uid?: string; // Added for Supabase Auth ID
   email: string;
   name: string;
+  avatar?: string; // Base64 or URL
   mobile?: string; // Added mobile number
   isLoggedIn: boolean;
   // Removed password field for security. Passwords should never be stored in frontend state/types.
