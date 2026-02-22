@@ -374,7 +374,7 @@ const App: React.FC = () => {
         if (localT) setTransactions(JSON.parse(localT));
     } catch (e) { console.error("Local load failed"); }
 
-    if (user.uid && isOnline && isSupabaseConfigured) {
+    if (user.uid && isOnline && isSupabaseConfigured && user.email !== 'guest@viyabaari.local') {
       if (isManualRefresh) setIsSyncing(true);
       
       try {
@@ -592,7 +592,9 @@ const App: React.FC = () => {
         {activeTab === 'accounts' && <Accounting transactions={transactions} language={language} onEdit={t => { setEditingTransaction(t); setIsAddingTransaction(true); }} onClear={handleClearTransactions} />}
         {activeTab === 'profile' && <Profile user={user} updateUser={setUser} stocks={stocks} transactions={transactions} onLogout={async () => { 
             try { await supabase.auth.signOut(); } catch(e) {}
-            localStorage.clear();
+            // Only clear session-specific items, NOT business data (stocks/txns)
+            localStorage.removeItem('viyabaari_active_user');
+            // Keep: viyabaari_stocks_*, viyabaari_txns_*, viyabaari_lang, viyabaari_supabase_*
             sessionStorage.clear();
             setUser(null); 
         }} onRestore={d => {}} language={language} onLanguageChange={(l) => { setLanguage(l); localStorage.setItem('viyabaari_lang', l); }} onClearTransactions={handleClearTransactions} onResetApp={() => {}} onSetupServer={() => setShowDatabaseConfig(true)} />}
@@ -667,7 +669,7 @@ const AuthScreen: React.FC<{ onLogin: (u: User) => void; language: 'ta' | 'en'; 
                 )}
 
                 <div className="mt-6 text-center border-t pt-4">
-                    <button onClick={() => onLogin({ email: 'guest@viyabaari.local', name: 'Guest', isLoggedIn: true })} className="text-indigo-600 font-bold text-sm hover:underline w-full">Guest Mode (Offline)</button>
+                    <button onClick={() => onLogin({ uid: 'guest-offline-id', email: 'guest@viyabaari.local', name: 'Guest', isLoggedIn: true })} className="text-indigo-600 font-bold text-sm hover:underline w-full">Guest Mode (Offline)</button>
                 </div>
          </div>
       </div>
