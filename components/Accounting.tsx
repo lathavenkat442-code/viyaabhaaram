@@ -37,15 +37,31 @@ const Accounting: React.FC<AccountingProps> = ({ transactions, language, onEdit,
     }).sort((a, b) => b.date - a.date); // Newest first
   }, [transactions, filterType, searchQuery]);
 
+  // Calculate Running Balance
+  const transactionsWithBalance = useMemo(() => {
+    // 1. Sort by Date Ascending (Oldest First) to calculate balance
+    const sortedAsc = [...filteredTransactions].sort((a, b) => a.date - b.date);
+    
+    let runningBalance = 0;
+    const withBalance = sortedAsc.map(txn => {
+        if (txn.type === 'INCOME') runningBalance += txn.amount;
+        else runningBalance -= txn.amount;
+        return { ...txn, runningBalance };
+    });
+    
+    // 2. Sort back to Descending (Newest First) for display
+    return withBalance.sort((a, b) => b.date - a.date);
+  }, [filteredTransactions]);
+
   // Group by Month (For List View)
   const groupedByMonth = useMemo(() => {
-    return filteredTransactions.reduce((acc: any, txn) => {
+    return transactionsWithBalance.reduce((acc: any, txn) => {
         const month = new Date(txn.date).toLocaleString(language, { month: 'long', year: 'numeric' });
         if (!acc[month]) acc[month] = [];
         acc[month].push(txn);
         return acc;
     }, {});
-  }, [filteredTransactions, language]);
+  }, [transactionsWithBalance, language]);
 
   // Group by Party (For Ledger View)
   const groupedByParty = useMemo(() => {
@@ -211,6 +227,9 @@ const Accounting: React.FC<AccountingProps> = ({ transactions, language, onEdit,
                                 <div className="text-right pt-2">
                                     <p className={`font-black text-sm ${txn.type === 'INCOME' ? 'text-green-600' : 'text-red-600'}`}>
                                         {txn.type === 'INCOME' ? '+' : '-'} ₹{txn.amount}
+                                    </p>
+                                    <p className="text-[10px] text-gray-400 font-bold mt-1">
+                                        Bal: ₹{txn.runningBalance.toLocaleString()}
                                     </p>
                                 </div>
                             </div>

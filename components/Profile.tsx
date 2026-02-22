@@ -1,8 +1,8 @@
 
 import React, { useState } from 'react';
 import { User, StockItem, Transaction, BackupFrequency } from '../types';
-import { LogOut, ShieldCheck, Download, FileSpreadsheet, HardDriveDownload, Globe, CheckCircle2, UploadCloud, Save, Cloud, Calendar, History, Settings, ToggleLeft, ToggleRight, Image, User as UserIcon, X, AlertTriangle, Eraser, Trash2, ChevronDown, Database, Wifi, WifiOff } from 'lucide-react';
-import { isSupabaseConfigured } from '../supabaseClient';
+import { LogOut, ShieldCheck, Download, FileSpreadsheet, HardDriveDownload, Globe, CheckCircle2, UploadCloud, Save, Cloud, Calendar, History, Settings, ToggleLeft, ToggleRight, Image, User as UserIcon, X, AlertTriangle, Eraser, Trash2, ChevronDown, Database, Wifi, WifiOff, Camera, Lock, KeyRound, Mail } from 'lucide-react';
+import { isSupabaseConfigured, supabase } from '../supabaseClient';
 
 interface ProfileProps {
   user: User;
@@ -15,7 +15,7 @@ interface ProfileProps {
   onLanguageChange: (lang: 'ta' | 'en') => void;
   onClearTransactions: () => void;
   onResetApp: () => void;
-  onSetupServer: () => void; // New prop for triggering setup
+  onSetupServer: () => void;
 }
 
 const Profile: React.FC<ProfileProps> = ({ user, updateUser, stocks, transactions, onLogout, onRestore, language, onLanguageChange, onClearTransactions, onResetApp, onSetupServer }) => {
@@ -23,6 +23,118 @@ const Profile: React.FC<ProfileProps> = ({ user, updateUser, stocks, transaction
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [tempAccountInput, setTempAccountInput] = useState('');
   const [showFrequencyDropdown, setShowFrequencyDropdown] = useState(false);
+  
+  // Profile Edit State
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [editName, setEditName] = useState(user.name);
+  const [editAvatar, setEditAvatar] = useState(user.avatar || '');
+  
+  // Password Change State
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  
+  // Delete Account State
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteStep, setDeleteStep] = useState<'CONFIRM' | 'OTP'>('CONFIRM');
+  const [otpInput, setOtpInput] = useState('');
+  const [generatedOtp, setGeneratedOtp] = useState('');
+
+  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        alert(language === 'ta' ? 'படம் 2MB-க்கு குறைவாக இருக்க வேண்டும்' : 'Image must be less than 2MB');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setEditAvatar(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleUpdateProfile = async () => {
+    try {
+      if (isSupabaseConfigured) {
+        const { error } = await supabase.auth.updateUser({
+          data: { full_name: editName, avatar_url: editAvatar }
+        });
+        if (error) throw error;
+      }
+      updateUser({ ...user, name: editName, avatar: editAvatar });
+      setIsEditingProfile(false);
+      alert(language === 'ta' ? 'சுயவிவரம் புதுப்பிக்கப்பட்டது' : 'Profile updated successfully');
+    } catch (error: any) {
+      alert(error.message);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (newPassword !== confirmPassword) {
+      alert(language === 'ta' ? 'கடவுச்சொற்கள் பொருந்தவில்லை' : 'Passwords do not match');
+      return;
+    }
+    if (newPassword.length < 6) {
+      alert(language === 'ta' ? 'கடவுச்சொல் குறைந்தது 6 எழுத்துக்கள் இருக்க வேண்டும்' : 'Password must be at least 6 characters');
+      return;
+    }
+    
+    try {
+      if (isSupabaseConfigured) {
+        const { error } = await supabase.auth.updateUser({ password: newPassword });
+        if (error) throw error;
+        alert(language === 'ta' ? 'கடவுச்சொல் மாற்றப்பட்டது' : 'Password updated successfully');
+        setShowPasswordModal(false);
+        setNewPassword('');
+        setConfirmPassword('');
+      } else {
+        alert("Offline mode: Cannot update password.");
+      }
+    } catch (error: any) {
+      alert(error.message);
+    }
+  };
+
+  const initiateDeleteAccount = () => {
+    // Simulate sending OTP
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    setGeneratedOtp(code);
+    console.log(`[Viyabaari Security] Your deletion OTP is: ${code}`);
+    alert(language === 'ta' 
+      ? `பாதுகாப்பு குறியீடு (OTP) உங்கள் மின்னஞ்சலுக்கு அனுப்பப்பட்டுள்ளது (Console-ஐ பார்க்கவும்: ${code})` 
+      : `Security OTP sent to your email (Check Console: ${code})`);
+    setDeleteStep('OTP');
+  };
+
+  const confirmDeleteAccount = async () => {
+    if (otpInput !== generatedOtp) {
+      alert(language === 'ta' ? 'தவறான குறியீடு' : 'Invalid OTP');
+      return;
+    }
+    
+    try {
+      // 1. Delete User Data
+      if (isSupabaseConfigured && user.uid) {
+        await supabase.from('stock_items').delete().eq('user_id', user.uid);
+        await supabase.from('transactions').delete().eq('user_id', user.uid);
+      }
+      
+      // 2. Clear Local Data
+      onResetApp();
+      
+      // 3. Sign Out (Since we can't delete auth user client-side easily without admin)
+      if (isSupabaseConfigured) {
+          await supabase.auth.signOut();
+      }
+      
+      alert(language === 'ta' ? 'உங்கள் கணக்கு நீக்கப்பட்டது' : 'Your account has been deleted');
+      window.location.reload();
+    } catch (error: any) {
+      alert(error.message);
+    }
+  };
 
   const downloadFile = (content: string, filename: string, type: string) => {
     try {
@@ -171,15 +283,29 @@ const Profile: React.FC<ProfileProps> = ({ user, updateUser, stocks, transaction
            <ShieldCheck size={140} className="text-indigo-900" />
         </div>
         <div className="relative z-10">
-          <div className="w-24 h-24 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-full mx-auto flex items-center justify-center text-white mb-4 shadow-2xl border-4 border-white">
-             <span className="text-3xl font-black">{user.name[0].toUpperCase()}</span>
+          <div className="relative w-24 h-24 mx-auto mb-4">
+            <div className="w-24 h-24 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-full flex items-center justify-center text-white shadow-2xl border-4 border-white overflow-hidden">
+               {user.avatar ? (
+                 <img src={user.avatar} alt="Profile" className="w-full h-full object-cover" />
+               ) : (
+                 <span className="text-3xl font-black">{user.name[0].toUpperCase()}</span>
+               )}
+            </div>
+            <button onClick={() => setIsEditingProfile(true)} className="absolute bottom-0 right-0 bg-white p-1.5 rounded-full shadow-md text-indigo-600 hover:bg-indigo-50 transition">
+              <Settings size={16} />
+            </button>
           </div>
+          
           <h2 className="text-2xl font-black text-gray-800 tracking-tight">{user.name}</h2>
           <p className="text-sm text-indigo-400 font-bold mb-4">{user.email}</p>
-          <div className="flex justify-center">
+          
+          <div className="flex justify-center gap-2">
              <div className="px-4 py-2 bg-green-500 text-white rounded-full text-[10px] font-black flex items-center gap-2 shadow-lg shadow-green-100">
                 <CheckCircle2 size={14}/> {language === 'ta' ? 'கணக்கு பாதுகாப்பானது' : 'Account Secured'}
              </div>
+             <button onClick={() => setShowPasswordModal(true)} className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black flex items-center gap-2 hover:bg-indigo-100 transition">
+                <KeyRound size={14}/> {language === 'ta' ? 'கடவுச்சொல் மாற்ற' : 'Change Password'}
+             </button>
           </div>
         </div>
       </div>
@@ -421,14 +547,10 @@ const Profile: React.FC<ProfileProps> = ({ user, updateUser, stocks, transaction
            </button>
 
            <button 
-             onClick={() => {
-                if(window.confirm(language === 'ta' ? 'நிச்சயமாக எல்லாவற்றையும் அழிக்கவா? இதை மாற்ற முடியாது.' : 'Factory Reset? This cannot be undone.')) {
-                    onResetApp();
-                }
-             }}
+             onClick={() => setShowDeleteModal(true)}
              className="w-full bg-red-600 p-4 rounded-2xl font-black text-white shadow-lg shadow-red-200 hover:bg-red-700 transition flex items-center justify-between"
            >
-              <span className="text-xs tamil-font">{language === 'ta' ? 'மொத்தமாக அழிக்க (Reset App)' : 'Factory Reset App'}</span>
+              <span className="text-xs tamil-font">{language === 'ta' ? 'கணக்கை நிரந்தரமாக நீக்க' : 'Delete Account Permanently'}</span>
               <Trash2 size={16} />
            </button>
         </div>
@@ -442,6 +564,134 @@ const Profile: React.FC<ProfileProps> = ({ user, updateUser, stocks, transaction
           <span className="uppercase tracking-widest text-sm">{language === 'ta' ? 'வெளியேறவும்' : 'Logout'}</span>
         </button>
       </div>
+
+      {/* Edit Profile Modal */}
+      {isEditingProfile && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
+           <div className="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl space-y-4">
+              <div className="flex justify-between items-center mb-2">
+                 <h3 className="font-black text-lg text-gray-800 tamil-font">{language === 'ta' ? 'சுயவிவரம் மாற்ற' : 'Edit Profile'}</h3>
+                 <button onClick={() => setIsEditingProfile(false)} className="p-2 bg-gray-100 rounded-full"><X size={16}/></button>
+              </div>
+              
+              <div className="flex justify-center mb-4">
+                 <label className="relative cursor-pointer group">
+                    <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-indigo-100 group-hover:border-indigo-300 transition">
+                       {editAvatar ? (
+                           <img src={editAvatar} className="w-full h-full object-cover" alt="Avatar" />
+                       ) : (
+                           <div className="w-full h-full bg-indigo-50 flex items-center justify-center text-indigo-300"><UserIcon size={40}/></div>
+                       )}
+                    </div>
+                    <div className="absolute bottom-0 right-0 bg-indigo-600 p-2 rounded-full text-white shadow-md">
+                       <Camera size={14} />
+                    </div>
+                    <input type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
+                 </label>
+              </div>
+
+              <div className="space-y-2">
+                 <label className="text-xs font-bold text-gray-500 ml-1">{language === 'ta' ? 'பெயர்' : 'Name'}</label>
+                 <input 
+                   value={editName}
+                   onChange={(e) => setEditName(e.target.value)}
+                   className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl font-bold outline-none focus:ring-2 focus:ring-indigo-100"
+                 />
+              </div>
+
+              <button onClick={handleUpdateProfile} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-black mt-4 shadow-lg shadow-indigo-200">
+                 {language === 'ta' ? 'சேமிக்க' : 'Save Changes'}
+              </button>
+           </div>
+        </div>
+      )}
+
+      {/* Change Password Modal */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
+           <div className="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl space-y-4">
+              <div className="flex justify-between items-center mb-2">
+                 <h3 className="font-black text-lg text-gray-800 tamil-font">{language === 'ta' ? 'கடவுச்சொல் மாற்ற' : 'Change Password'}</h3>
+                 <button onClick={() => setShowPasswordModal(false)} className="p-2 bg-gray-100 rounded-full"><X size={16}/></button>
+              </div>
+              
+              <div className="space-y-3">
+                 <div>
+                    <label className="text-xs font-bold text-gray-500 ml-1">{language === 'ta' ? 'புதிய கடவுச்சொல்' : 'New Password'}</label>
+                    <input 
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl font-bold outline-none focus:ring-2 focus:ring-indigo-100"
+                    />
+                 </div>
+                 <div>
+                    <label className="text-xs font-bold text-gray-500 ml-1">{language === 'ta' ? 'மீண்டும் உள்ளிடவும்' : 'Confirm Password'}</label>
+                    <input 
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl font-bold outline-none focus:ring-2 focus:ring-indigo-100"
+                    />
+                 </div>
+              </div>
+
+              <button onClick={handleChangePassword} className="w-full bg-indigo-600 text-white p-4 rounded-xl font-black mt-4 shadow-lg shadow-indigo-200">
+                 {language === 'ta' ? 'மாற்றுக' : 'Update Password'}
+              </button>
+           </div>
+        </div>
+      )}
+
+      {/* Delete Account Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4 backdrop-blur-sm animate-in zoom-in duration-300">
+           <div className="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl space-y-4 border-2 border-red-100">
+              <div className="flex justify-between items-center mb-2">
+                 <h3 className="font-black text-lg text-red-600 tamil-font flex items-center gap-2">
+                    <AlertTriangle size={20} />
+                    {language === 'ta' ? 'கணக்கை நீக்க' : 'Delete Account'}
+                 </h3>
+                 <button onClick={() => setShowDeleteModal(false)} className="p-2 bg-gray-100 rounded-full"><X size={16}/></button>
+              </div>
+
+              {deleteStep === 'CONFIRM' ? (
+                  <div className="space-y-4">
+                      <p className="text-sm font-bold text-gray-600 leading-relaxed">
+                          {language === 'ta' 
+                            ? 'உங்கள் கணக்கு மற்றும் அனைத்து தரவுகளும் நிரந்தரமாக நீக்கப்படும். இதை மீட்டெடுக்க முடியாது.' 
+                            : 'Your account and all data will be permanently deleted. This action cannot be undone.'}
+                      </p>
+                      <button onClick={initiateDeleteAccount} className="w-full bg-red-600 text-white p-4 rounded-xl font-black shadow-lg shadow-red-200 hover:bg-red-700 transition">
+                          {language === 'ta' ? 'தொடரவும் (Send OTP)' : 'Proceed (Send OTP)'}
+                      </button>
+                  </div>
+              ) : (
+                  <div className="space-y-4">
+                      <div className="bg-indigo-50 p-4 rounded-xl flex items-center gap-3">
+                          <Mail className="text-indigo-600" size={24} />
+                          <div>
+                              <p className="text-xs font-bold text-indigo-900">{language === 'ta' ? 'மின்னஞ்சலை பார்க்கவும்' : 'Check your Email'}</p>
+                              <p className="text-[10px] text-indigo-500 font-bold">{user.email}</p>
+                          </div>
+                      </div>
+                      <div>
+                          <label className="text-xs font-bold text-gray-500 ml-1">{language === 'ta' ? 'OTP குறியீடு' : 'Enter OTP Code'}</label>
+                          <input 
+                            value={otpInput}
+                            onChange={(e) => setOtpInput(e.target.value)}
+                            placeholder="123456"
+                            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl font-black text-center text-xl tracking-widest outline-none focus:ring-2 focus:ring-red-100"
+                          />
+                      </div>
+                      <button onClick={confirmDeleteAccount} className="w-full bg-red-600 text-white p-4 rounded-xl font-black shadow-lg shadow-red-200 hover:bg-red-700 transition">
+                          {language === 'ta' ? 'உறுதிப்படுத்தவும்' : 'Confirm Deletion'}
+                      </button>
+                  </div>
+              )}
+           </div>
+        </div>
+      )}
 
       {/* Account Selection Modal */}
       {showAccountModal && (
