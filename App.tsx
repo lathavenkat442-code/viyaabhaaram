@@ -470,7 +470,7 @@ const App: React.FC = () => {
     try {
         const newItem = { ...itemData, id: id || Date.now().toString(), lastUpdated: Date.now() };
         
-        // Immediate Optimistic Update
+        // Immediate Optimistic Update (Keep Base64 images locally)
         setStocks(prev => {
           const updated = id ? prev.map(s => s.id === id ? newItem : s) : [newItem, ...prev];
           try { localStorage.setItem(`viyabaari_stocks_${emailKey}`, JSON.stringify(updated)); } catch(e) { console.warn("LocalStorage quota exceeded"); }
@@ -478,24 +478,47 @@ const App: React.FC = () => {
         });
 
         if (user.uid && isOnline && isSupabaseConfigured) {
+          // Prepare item for Cloud (Handle Images)
+          // We clone the item to avoid modifying the local optimistic state
+          const cloudItem = JSON.parse(JSON.stringify(newItem));
+          
+          if (cloudItem.variants && Array.isArray(cloudItem.variants)) {
+              for (let i = 0; i < cloudItem.variants.length; i++) {
+                  const v = cloudItem.variants[i];
+                  if (v.imageUrl && v.imageUrl.startsWith('data:image')) {
+                      try {
+                          // Attempt Upload
+                          const res = await fetch(v.imageUrl);
+                          const blob = await res.blob();
+                          const fileExt = blob.type.split('/')[1] || 'jpg';
+                          const fileName = `${user.uid}/stocks/${Date.now()}_${i}.${fileExt}`;
+                          
+                          const { data, error } = await supabase.storage.from('product-images').upload(fileName, blob, { upsert: true });
+                          if (error) throw error;
+                          
+                          const { data: { publicUrl } } = supabase.storage.from('product-images').getPublicUrl(fileName);
+                          cloudItem.variants[i].imageUrl = publicUrl;
+                      } catch (uploadErr) {
+                          console.warn("Image upload failed, saving text-only to cloud to prevent crash:", uploadErr);
+                          // If upload fails, STRIP the image from cloud payload
+                          // This prevents "Payload Too Large" errors and ensures at least the text data is saved
+                          cloudItem.variants[i].imageUrl = ''; 
+                      }
+                  }
+              }
+          }
+
           // Use .select() to ensure confirmed save
           const { data, error } = await supabase.from('stock_items')
-            .upsert({ id: newItem.id, user_id: user.uid, content: newItem, last_updated: newItem.lastUpdated })
+            .upsert({ id: cloudItem.id, user_id: user.uid, content: cloudItem, last_updated: cloudItem.lastUpdated })
             .select();
           
           if (error) throw error;
           
-          // Double verify state with returned data if it's different
-          if (data && data[0] && data[0].content) {
-            try {
-              const confirmedItem = typeof data[0].content === 'string' ? JSON.parse(data[0].content) : data[0].content;
-              if (confirmedItem && confirmedItem.id) {
-                setStocks(prev => prev.map(s => s.id === confirmedItem.id ? confirmedItem : s));
-              }
-            } catch (e) {
-              console.error("Error parsing confirmed item", e);
-            }
-          }
+          // We don't update local state from return value here to preserve the local base64 images 
+          // if the cloud upload failed. 
+          // If cloud upload succeeded, the local state will eventually sync on next fetch or reload, 
+          // but for now, keeping local base64 is safer for UX.
         }
         
         setIsAddingStock(false); 
