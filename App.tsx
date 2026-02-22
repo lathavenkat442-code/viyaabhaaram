@@ -334,6 +334,11 @@ const App: React.FC = () => {
     const savedLang = localStorage.getItem('viyabaari_lang');
     if (savedLang === 'ta' || savedLang === 'en') setLanguage(savedLang);
 
+    // Safety timeout to prevent infinite loading
+    const safetyTimeout = setTimeout(() => {
+        setIsAppLoading(false);
+    }, 5000);
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setUser({ 
@@ -347,6 +352,7 @@ const App: React.FC = () => {
         const savedUser = localStorage.getItem('viyabaari_active_user');
         if (savedUser) { try { setUser(JSON.parse(savedUser)); } catch(e) { localStorage.removeItem('viyabaari_active_user'); } }
       }
+      clearTimeout(safetyTimeout);
       setIsAppLoading(false);
     }).catch(err => {
       console.error("Session check failed", err);
@@ -370,33 +376,53 @@ const App: React.FC = () => {
 
     if (user.uid && isOnline && isSupabaseConfigured) {
       if (isManualRefresh) setIsSyncing(true);
+      
       try {
         // Force Fetch Stocks
         const { data: sData, error: sError } = await supabase.from('stock_items').select('*').eq('user_id', user.uid).order('last_updated', { ascending: false });
-        if (sError) console.error("Fetch stocks error:", sError);
+        
+        if (sError) throw sError;
+        
         if (sData) {
           const freshS = sData.map((r: any) => {
-              try { return typeof r.content === 'string' ? JSON.parse(r.content) : r.content; } catch(e) { return null; }
+              // Try content field first, then fallback to row itself if it has id
+              if (r.content) {
+                  try { return typeof r.content === 'string' ? JSON.parse(r.content) : r.content; } catch(e) { return null; }
+              }
+              return r.id ? r : null;
           }).filter(Boolean);
+          
           setStocks(freshS);
           try { localStorage.setItem(`viyabaari_stocks_${emailKey}`, JSON.stringify(freshS)); } catch(e) {}
         }
 
         // Force Fetch Transactions
         const { data: tData, error: tError } = await supabase.from('transactions').select('*').eq('user_id', user.uid);
-        if (tError) console.error("Fetch txns error:", tError);
+        
+        if (tError) throw tError;
+        
         if (tData) {
           const freshT = tData.map((r: any) => {
-              try { return typeof r.content === 'string' ? JSON.parse(r.content) : r.content; } catch(e) { return null; }
+              if (r.content) {
+                  try { return typeof r.content === 'string' ? JSON.parse(r.content) : r.content; } catch(e) { return null; }
+              }
+              return r.id ? r : null;
           }).filter(Boolean);
+          
           freshT.sort((a: any, b: any) => (b.date || 0) - (a.date || 0));
           setTransactions(freshT);
           try { localStorage.setItem(`viyabaari_txns_${emailKey}`, JSON.stringify(freshT)); } catch(e) {}
         }
-      } catch (e) { console.error("Cloud fetch failed", e); }
-      finally { if (isManualRefresh) setIsSyncing(false); }
+      } catch (e) { 
+          console.error("Cloud fetch failed", e); 
+      } finally { 
+          if (isManualRefresh) setIsSyncing(false);
+          setIsAppLoading(false); 
+      }
+    } else {
+        setIsAppLoading(false);
     }
-  }, [user, isOnline]);
+  }, [user?.uid, user?.email, isOnline]);
 
   useEffect(() => { if (user) fetchData(); }, [user?.uid, fetchData]);
 
@@ -552,12 +578,12 @@ const App: React.FC = () => {
   return (
     <div className="max-w-md mx-auto min-h-screen bg-slate-50 flex flex-col shadow-xl">
       <Toast message={toast.msg} show={toast.show} isError={toast.isError} onClose={() => setToast({ ...toast, show: false })} />
-      <header className="bg-indigo-600 text-white p-3 sm:p-4 sticky top-0 z-10 shadow-md flex flex-wrap gap-2 justify-between items-center">
-        <div className="flex items-center gap-2"><h1 className="text-lg sm:text-xl font-bold tamil-font truncate">{t.appName}</h1></div>
+      <header className="bg-indigo-600 text-white p-3 sticky top-0 z-10 shadow-md flex flex-wrap gap-2 justify-between items-center">
+        <div className="flex items-center gap-2"><h1 className="text-lg font-bold tamil-font truncate">{t.appName}</h1></div>
         <div className="flex gap-2 items-center">
-            {isOnline && user.uid && <button onClick={() => fetchData(true)} className={`p-2 bg-white/10 hover:bg-white/20 rounded-full transition ${isSyncing ? 'animate-spin' : ''}`}><RefreshCw size={20} /></button>}
-            <button onClick={() => { setEditingStock(null); setIsAddingStock(true); }} className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition"><PlusCircle size={20}/></button>
-            <button onClick={() => { setEditingTransaction(null); setIsAddingTransaction(true); }} className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition"><ArrowLeftRight size={20}/></button>
+            {isOnline && user.uid && <button onClick={() => fetchData(true)} className={`p-2 bg-white/10 hover:bg-white/20 rounded-full transition ${isSyncing ? 'animate-spin' : ''}`}><RefreshCw size={18} /></button>}
+            <button onClick={() => { setEditingStock(null); setIsAddingStock(true); }} className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition"><PlusCircle size={18}/></button>
+            <button onClick={() => { setEditingTransaction(null); setIsAddingTransaction(true); }} className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition"><ArrowLeftRight size={18}/></button>
         </div>
       </header>
       <main className="flex-1 overflow-y-auto pb-24">
@@ -565,7 +591,7 @@ const App: React.FC = () => {
         {activeTab === 'stock' && <Inventory stocks={stocks} onDelete={handleDeleteStock} onEdit={s => { setEditingStock(s); setIsAddingStock(true); }} language={language} />}
         {activeTab === 'accounts' && <Accounting transactions={transactions} language={language} onEdit={t => { setEditingTransaction(t); setIsAddingTransaction(true); }} onClear={handleClearTransactions} />}
         {activeTab === 'profile' && <Profile user={user} updateUser={setUser} stocks={stocks} transactions={transactions} onLogout={async () => { 
-            await supabase.auth.signOut(); 
+            try { await supabase.auth.signOut(); } catch(e) {}
             localStorage.clear();
             sessionStorage.clear();
             setUser(null); 

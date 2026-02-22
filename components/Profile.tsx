@@ -57,16 +57,76 @@ const Profile: React.FC<ProfileProps> = ({ user, updateUser, stocks, transaction
 
   const handleUpdateProfile = async () => {
     try {
+      let avatarUrl = editAvatar;
+      let storageSuccess = false;
+
+      if (isSupabaseConfigured && editAvatar && editAvatar.startsWith('data:image')) {
+        try {
+            // 1. Convert Base64 to Blob
+            const res = await fetch(editAvatar);
+            const blob = await res.blob();
+            // Generate a unique filename
+            const fileExt = blob.type.split('/')[1] || 'jpg';
+            const fileName = `${user.uid}-${Date.now()}.${fileExt}`;
+
+            // 2. Upload to 'avatars' bucket
+            const { data, error } = await supabase.storage
+                .from('avatars')
+                .upload(fileName, blob, { upsert: true });
+
+            if (error) throw error;
+
+            // 3. Get Public URL
+            if (data) {
+                const { data: publicUrlData } = supabase.storage
+                    .from('avatars')
+                    .getPublicUrl(data.path);
+                avatarUrl = publicUrlData.publicUrl;
+                storageSuccess = true;
+            }
+        } catch (storageError) {
+            console.warn("Storage upload failed (likely no bucket/RLS). Skipping cloud avatar update.", storageError);
+            // Fallback: Do NOT save base64 to user_metadata to prevent header overflow.
+            // We'll keep the old avatar URL in the cloud if available, or empty.
+            avatarUrl = user.avatar || ''; 
+            
+            if (language === 'ta') {
+                alert('புகைப்படம் Cloud-ல் சேமிக்கப்படவில்லை (Storage Error), ஆனால் உள்ளூரில் காட்டப்படும்.');
+            } else {
+                alert('Image not saved to cloud (Storage Error), but shown locally.');
+            }
+        }
+      }
+
       if (isSupabaseConfigured) {
+        // Only update auth user if we have a valid URL or if it's not a huge base64 string
+        const isBase64 = avatarUrl?.startsWith('data:image');
+        const isTooLarge = isBase64 && avatarUrl.length > 2000; // Arbitrary limit for metadata
+
+        const updateData: any = { full_name: editName };
+        
+        // Only update avatar_url if it's a remote URL (storage success) or small enough
+        if (!isTooLarge && (storageSuccess || !isBase64)) {
+            updateData.avatar_url = avatarUrl;
+        } else if (isTooLarge) {
+            // If it's too large and we couldn't upload it, we MUST clear it from metadata
+            // to prevent header overflow issues for the user account.
+            updateData.avatar_url = ''; 
+        }
+
         const { error } = await supabase.auth.updateUser({
-          data: { full_name: editName, avatar_url: editAvatar }
+          data: updateData
         });
         if (error) throw error;
       }
-      updateUser({ ...user, name: editName, avatar: editAvatar });
+      
+      // Update local state with whatever the user selected (even if base64) so they see immediate change
+      // If storage succeeded, use the public URL. If not, use the local base64 (editAvatar)
+      updateUser({ ...user, name: editName, avatar: storageSuccess ? avatarUrl : editAvatar });
       setIsEditingProfile(false);
       alert(language === 'ta' ? 'சுயவிவரம் புதுப்பிக்கப்பட்டது' : 'Profile updated successfully');
     } catch (error: any) {
+      console.error("Profile update error:", error);
       alert(error.message);
     }
   };
