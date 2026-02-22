@@ -377,15 +377,31 @@ const App: React.FC = () => {
     if (user.uid && isOnline && isSupabaseConfigured && user.email !== 'guest@viyabaari.local') {
       if (isManualRefresh) setIsSyncing(true);
       
+      // 1. Safe Profile Refresh (Separate Try-Catch) - Bypass on error
       try {
-        // Force Fetch Stocks
+         if (isManualRefresh) {
+             const { data: { user: updatedUser }, error: uError } = await supabase.auth.getUser();
+             if (uError) throw uError;
+             if (updatedUser) {
+                 setUser(prev => prev ? ({ 
+                     ...prev, 
+                     name: updatedUser.user_metadata.full_name || updatedUser.user_metadata.name || prev.name,
+                     avatar: updatedUser.user_metadata.avatar_url || prev.avatar 
+                 }) : prev);
+             }
+         }
+      } catch (e) {
+         console.warn("Profile refresh failed, continuing to data...", e);
+      }
+
+      // 2. Fetch Stocks (Separate Try-Catch)
+      try {
         const { data: sData, error: sError } = await supabase.from('stock_items').select('*').eq('user_id', user.uid).order('last_updated', { ascending: false });
         
         if (sError) throw sError;
         
         if (sData) {
           const freshS = sData.map((r: any) => {
-              // Try content field first, then fallback to row itself if it has id
               let item = null;
               if (r.content) {
                   try { item = typeof r.content === 'string' ? JSON.parse(r.content) : r.content; } catch(e) { item = null; }
@@ -393,7 +409,6 @@ const App: React.FC = () => {
                   item = r;
               }
               
-              // Normalize old data structure to new variants structure
               if (item && (!item.variants || !Array.isArray(item.variants))) {
                   item.variants = [{
                       id: 'default-' + item.id,
@@ -406,15 +421,18 @@ const App: React.FC = () => {
                       }]
                   }];
               }
-              
               return item;
           }).filter(Boolean);
           
           setStocks(freshS);
           try { localStorage.setItem(`viyabaari_stocks_${emailKey}`, JSON.stringify(freshS)); } catch(e) {}
         }
+      } catch (e) { 
+          console.error("Stock fetch failed", e); 
+      }
 
-        // Force Fetch Transactions
+      // 3. Fetch Transactions (Separate Try-Catch)
+      try {
         const { data: tData, error: tError } = await supabase.from('transactions').select('*').eq('user_id', user.uid);
         
         if (tError) throw tError;
@@ -432,11 +450,12 @@ const App: React.FC = () => {
           try { localStorage.setItem(`viyabaari_txns_${emailKey}`, JSON.stringify(freshT)); } catch(e) {}
         }
       } catch (e) { 
-          console.error("Cloud fetch failed", e); 
-      } finally { 
-          if (isManualRefresh) setIsSyncing(false);
-          setIsAppLoading(false); 
+          console.error("Transaction fetch failed", e); 
       }
+
+      // Always clear loading states
+      if (isManualRefresh) setIsSyncing(false);
+      setIsAppLoading(false);
     } else {
         setIsAppLoading(false);
     }
