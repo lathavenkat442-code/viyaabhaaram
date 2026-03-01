@@ -366,8 +366,14 @@ const App: React.FC = () => {
     if (user.uid && isOnline && isSupabaseConfigured) {
       if (isManualRefresh) setIsSyncing(true);
       try {
-        // Force Fetch Stocks
-        const { data: sData, error: sError } = await supabase.from('stock_items').select('*').eq('user_id', user.uid).order('last_updated', { ascending: false });
+        const [
+          { data: sData, error: sError },
+          { data: tData, error: tError }
+        ] = await Promise.all([
+          supabase.from('stock_items').select('*').eq('user_id', user.uid).order('last_updated', { ascending: false }),
+          supabase.from('transactions').select('*').eq('user_id', user.uid)
+        ]);
+
         if (sError) console.error("Fetch stocks error:", sError);
         if (sData) {
           const freshS = sData.map((r: any) => {
@@ -377,8 +383,6 @@ const App: React.FC = () => {
           try { localStorage.setItem(`viyabaari_stocks_${emailKey}`, JSON.stringify(freshS)); } catch(e) {}
         }
 
-        // Force Fetch Transactions
-        const { data: tData, error: tError } = await supabase.from('transactions').select('*').eq('user_id', user.uid);
         if (tError) console.error("Fetch txns error:", tError);
         if (tData) {
           const freshT = tData.map((r: any) => {

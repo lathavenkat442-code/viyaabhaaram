@@ -8,6 +8,7 @@ export default defineConfig({
     'process.env': {}
   },
   build: {
+    target: 'es2015',
     outDir: 'dist',
     sourcemap: true
   }
