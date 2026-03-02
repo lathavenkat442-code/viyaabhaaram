@@ -492,8 +492,8 @@ const Inventory: React.FC<{ stocks: StockItem[]; onDelete: (id: string) => Promi
   };
 
   return (
-    <div className="p-4 space-y-4">
-      <div className="flex gap-2 sticky top-0 z-10 bg-slate-50/95 backdrop-blur-md pb-2">
+    <div className="p-4 space-y-4 pb-6">
+      <div className="flex gap-2 sticky top-0 z-30 bg-slate-50/95 backdrop-blur-md pb-2">
         <div className="relative flex-1">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={language === 'ta' ? 'சரக்கு தேடவும்...' : 'Search items...'} className="w-full pl-11 p-4 bg-white border border-gray-200 rounded-2xl outline-none shadow-sm focus:border-indigo-400 text-slate-900" />

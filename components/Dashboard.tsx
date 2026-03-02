@@ -40,7 +40,7 @@ const Dashboard: React.FC<{ stocks: StockItem[]; transactions: Transaction[]; la
   const isGuestOrOffline = !isSupabaseConfigured || user?.email?.includes('guest') || !user?.uid;
 
   return (
-    <div className="p-4 space-y-6">
+    <div className="p-4 space-y-6 pb-6">
       {isGuestOrOffline && (
         <div onClick={onSetupServer} className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center justify-between cursor-pointer shadow-sm">
             <div className="flex items-center gap-3">

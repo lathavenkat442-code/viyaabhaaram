@@ -276,7 +276,7 @@ const Profile: React.FC<ProfileProps> = ({ user, updateUser, stocks, transaction
   const sizeString = dataSize > 1024 * 1024 ? `${(dataSize / (1024 * 1024)).toFixed(2)} MB` : dataSize > 1024 ? `${(dataSize / 1024).toFixed(2)} KB` : `${dataSize} Bytes`;
 
   return (
-    <div className="p-4 space-y-6 pb-28">
+    <div className="p-4 space-y-6 pb-6">
       {/* User Profile Header */}
       <div className="bg-white rounded-[2.5rem] p-8 text-center shadow-lg relative overflow-hidden border border-indigo-50">
         <div className="absolute top-0 right-0 p-4 opacity-5">

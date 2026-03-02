@@ -13,6 +13,34 @@ import {
 
 const EXPENSE_CATEGORIES = ['Salary', 'Rent', 'Tea/Snacks', 'Transport', 'Purchase', 'Sales', 'Electricity', 'Maintenance', 'Others'];
 
+const dbPromise = new Promise<IDBDatabase>((resolve, reject) => {
+  const req = indexedDB.open('viyabaari_cache', 1);
+  req.onupgradeneeded = () => req.result.createObjectStore('store');
+  req.onsuccess = () => resolve(req.result);
+  req.onerror = () => reject(req.error);
+});
+
+const idbSet = async (key: string, val: any) => {
+  try {
+    const db = await dbPromise;
+    db.transaction('store', 'readwrite').objectStore('store').put(val, key);
+  } catch (e) { console.warn('IDB set error', e); }
+};
+
+const idbGet = async (key: string): Promise<any> => {
+  try {
+    const db = await dbPromise;
+    return new Promise((resolve) => {
+      const req = db.transaction('store', 'readonly').objectStore('store').get(key);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => resolve(null);
+    });
+  } catch (e) {
+    console.warn('IDB get error', e);
+    return null;
+  }
+};
+
 const Toast: React.FC<{ message: string; show: boolean; onClose: () => void; isError?: boolean }> = ({ message, show, onClose, isError }) => {
     useEffect(() => {
         if (show) {
@@ -120,7 +148,33 @@ const AddStockModal: React.FC<{ onSave: (item: any, id?: string) => void; onClos
       const readFile = (file: File): Promise<string> => {
         return new Promise((resolve) => {
             const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
+            reader.onloadend = () => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+                    const max_size = 800;
+                    if (width > height) {
+                        if (width > max_size) {
+                            height *= max_size / width;
+                            width = max_size;
+                        }
+                    } else {
+                        if (height > max_size) {
+                            width *= max_size / height;
+                            height = max_size;
+                        }
+                    }
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx?.drawImage(img, 0, 0, width, height);
+                    resolve(canvas.toDataURL('image/jpeg', 0.7));
+                };
+                img.onerror = () => resolve(reader.result as string);
+                img.src = reader.result as string;
+            };
             reader.readAsDataURL(file);
         });
       };
@@ -357,10 +411,19 @@ const App: React.FC = () => {
     
     // Immediate Local Load
     try {
-        const localS = localStorage.getItem(`viyabaari_stocks_${emailKey}`);
-        const localT = localStorage.getItem(`viyabaari_txns_${emailKey}`);
-        if (localS) setStocks(JSON.parse(localS));
-        if (localT) setTransactions(JSON.parse(localT));
+        let localS = await idbGet(`viyabaari_stocks_${emailKey}`);
+        if (!localS) {
+            const ls = localStorage.getItem(`viyabaari_stocks_${emailKey}`);
+            if (ls) localS = JSON.parse(ls);
+        }
+        if (localS) setStocks(localS);
+
+        let localT = await idbGet(`viyabaari_txns_${emailKey}`);
+        if (!localT) {
+            const lt = localStorage.getItem(`viyabaari_txns_${emailKey}`);
+            if (lt) localT = JSON.parse(lt);
+        }
+        if (localT) setTransactions(localT);
     } catch (e) { console.error("Local load failed"); }
 
     if (user.uid && isOnline && isSupabaseConfigured) {
@@ -380,6 +443,7 @@ const App: React.FC = () => {
               try { return typeof r.content === 'string' ? JSON.parse(r.content) : r.content; } catch(e) { return null; }
           }).filter(Boolean);
           setStocks(freshS);
+          idbSet(`viyabaari_stocks_${emailKey}`, freshS);
           try { localStorage.setItem(`viyabaari_stocks_${emailKey}`, JSON.stringify(freshS)); } catch(e) {}
         }
 
@@ -390,6 +454,7 @@ const App: React.FC = () => {
           }).filter(Boolean);
           freshT.sort((a: any, b: any) => (b.date || 0) - (a.date || 0));
           setTransactions(freshT);
+          idbSet(`viyabaari_txns_${emailKey}`, freshT);
           try { localStorage.setItem(`viyabaari_txns_${emailKey}`, JSON.stringify(freshT)); } catch(e) {}
         }
       } catch (e) { console.error("Cloud fetch failed", e); }
@@ -409,6 +474,7 @@ const App: React.FC = () => {
         // Immediate Optimistic Update
         setStocks(prev => {
           const updated = id ? prev.map(s => s.id === id ? newItem : s) : [newItem, ...prev];
+          idbSet(`viyabaari_stocks_${emailKey}`, updated);
           try { localStorage.setItem(`viyabaari_stocks_${emailKey}`, JSON.stringify(updated)); } catch(e) { console.warn("LocalStorage quota exceeded"); }
           return updated;
         });
@@ -455,6 +521,7 @@ const App: React.FC = () => {
         // Immediate UI Update
         setTransactions(prev => {
           const updated = id ? prev.map(t => t.id === id ? newTxn : t) : [newTxn, ...prev];
+          idbSet(`viyabaari_txns_${emailKey}`, updated);
           try { localStorage.setItem(`viyabaari_txns_${emailKey}`, JSON.stringify(updated)); } catch(e) { console.warn("LocalStorage quota exceeded"); }
           return updated;
         });
@@ -506,6 +573,7 @@ const App: React.FC = () => {
     try {
         setStocks(prev => {
             const updated = prev.filter(s => s.id !== id);
+            idbSet(`viyabaari_stocks_${emailKey}`, updated);
             try { localStorage.setItem(`viyabaari_stocks_${emailKey}`, JSON.stringify(updated)); } catch(e) {}
             return updated;
         });
@@ -528,6 +596,7 @@ const App: React.FC = () => {
     if (!user) return;
     const emailKey = getEmailKey(user.email);
     setTransactions([]);
+    idbSet(`viyabaari_txns_${emailKey}`, []);
     try { localStorage.setItem(`viyabaari_txns_${emailKey}`, '[]'); } catch(e) {}
     if (user.uid && isOnline && isSupabaseConfigured) {
        await supabase.from('transactions').delete().eq('user_id', user.uid);
@@ -549,9 +618,9 @@ const App: React.FC = () => {
   if (!user) return <AuthScreen onLogin={u => { setUser(u); localStorage.setItem('viyabaari_active_user', JSON.stringify(u)); window.location.reload(); }} language={language} t={t} isOnline={isOnline} />;
 
   return (
-    <div className="max-w-md mx-auto min-h-screen bg-slate-50 flex flex-col shadow-xl">
+    <div className="max-w-md mx-auto h-[100dvh] bg-slate-50 flex flex-col shadow-xl overflow-hidden relative">
       <Toast message={toast.msg} show={toast.show} isError={toast.isError} onClose={() => setToast({ ...toast, show: false })} />
-      <header className="bg-indigo-600 text-white p-4 sticky top-0 z-10 shadow-md flex flex-wrap gap-2 justify-between items-center">
+      <header className="bg-indigo-600 text-white p-4 z-50 shadow-md flex flex-wrap gap-2 justify-between items-center shrink-0">
         <div className="flex items-center gap-2"><h1 className="text-xl font-bold tamil-font truncate">{t.appName}</h1></div>
         <div className="flex gap-3 items-center">
             {isOnline && user.uid && <button onClick={() => fetchData(true)} className={`p-2 bg-white/10 hover:bg-white/20 rounded-full transition ${isSyncing ? 'animate-spin' : ''}`}><RefreshCw size={20} /></button>}
@@ -559,7 +628,7 @@ const App: React.FC = () => {
             <button onClick={() => { setEditingTransaction(null); setIsAddingTransaction(true); }} className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition"><ArrowLeftRight size={20}/></button>
         </div>
       </header>
-      <main className="flex-1 overflow-y-auto pb-24">
+      <main className="flex-1 overflow-y-auto relative">
         {activeTab === 'dashboard' && <Dashboard stocks={stocks} transactions={transactions} language={language} user={user} onSetupServer={() => setShowDatabaseConfig(true)} />}
         {activeTab === 'stock' && <Inventory stocks={stocks} onDelete={handleDeleteStock} onEdit={s => { setEditingStock(s); setIsAddingStock(true); }} language={language} />}
         {activeTab === 'accounts' && <Accounting transactions={transactions} language={language} onEdit={t => { setEditingTransaction(t); setIsAddingTransaction(true); }} onClear={handleClearTransactions} />}
@@ -576,7 +645,7 @@ const App: React.FC = () => {
       {showDatabaseConfig && <DatabaseConfigModal onClose={() => setShowDatabaseConfig(false)} language={language} />}
       {isAddingStock && <AddStockModal onSave={saveStock} onClose={() => setIsAddingStock(false)} initialData={editingStock || undefined} language={language} t={t} />}
       {isAddingTransaction && <AddTransactionModal onSave={saveTransaction} onClose={() => setIsAddingTransaction(false)} initialData={editingTransaction || undefined} language={language} t={t} />}
-      <nav className="bg-indigo-600 border-t border-indigo-500 fixed bottom-0 w-full max-w-md flex justify-around p-3 z-10 text-white">
+      <nav className="bg-indigo-600 border-t border-indigo-500 w-full flex justify-around p-3 z-50 text-white shrink-0">
         <button onClick={() => setActiveTab('dashboard')} className={`flex flex-col items-center transition ${activeTab === 'dashboard' ? 'opacity-100 scale-110' : 'opacity-60 hover:opacity-80'}`}><LayoutDashboard size={24} /><span className="text-[10px] tamil-font mt-1">{t.dashboard}</span></button>
         <button onClick={() => setActiveTab('stock')} className={`flex flex-col items-center transition ${activeTab === 'stock' ? 'opacity-100 scale-110' : 'opacity-60 hover:opacity-80'}`}><Package size={24} /><span className="text-[10px] tamil-font mt-1">{t.stock}</span></button>
         <button onClick={() => setActiveTab('accounts')} className={`flex flex-col items-center transition ${activeTab === 'accounts' ? 'opacity-100 scale-110' : 'opacity-60 hover:opacity-80'}`}><ArrowLeftRight size={24} /><span className="text-[10px] tamil-font mt-1">{t.accounts}</span></button>

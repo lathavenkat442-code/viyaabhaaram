@@ -99,7 +99,7 @@ const Accounting: React.FC<AccountingProps> = ({ transactions, language, onEdit,
   };
 
   return (
-    <div className="p-4 space-y-4 pb-28">
+    <div className="p-4 space-y-4 pb-6">
       {/* Summary Header */}
       <div className="bg-indigo-600 rounded-[2rem] p-6 text-white shadow-lg shadow-indigo-200">
          <div className="flex justify-between items-start mb-4">
@@ -150,7 +150,7 @@ const Accounting: React.FC<AccountingProps> = ({ transactions, language, onEdit,
       </div>
 
       {/* Controls */}
-      <div className="space-y-3 sticky top-0 bg-slate-50/95 backdrop-blur-sm z-10 py-2">
+      <div className="space-y-3 sticky top-0 bg-slate-50/95 backdrop-blur-sm z-30 py-2">
           {/* Search */}
           <div className="relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
