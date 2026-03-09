@@ -61,6 +61,13 @@ export interface User {
   includePhotosInBackup?: boolean;
 }
 
+export interface AppNotification {
+  id: string;
+  message: string;
+  timestamp: number;
+  read: boolean;
+}
+
 export interface AppState {
   stocks: StockItem[];
   transactions: Transaction[];

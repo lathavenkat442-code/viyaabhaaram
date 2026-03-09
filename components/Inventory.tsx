@@ -40,7 +40,7 @@ const StockDetailView: React.FC<{ item: StockItem; onClose: () => void; onEdit: 
     const currentVariant = variants[activeSlide];
 
     return (
-        <div className="fixed inset-0 bg-white z-50 flex flex-col animate-in slide-in-from-bottom duration-300">
+        <div className="fixed inset-0 max-w-md mx-auto bg-white z-[60] flex flex-col animate-in slide-in-from-bottom duration-300">
             {/* Header */}
             <div className="bg-white/80 backdrop-blur-md p-4 flex justify-between items-center sticky top-0 z-20 border-b border-gray-100">
                 <button onClick={onClose} className="p-2 -ml-2 rounded-full hover:bg-gray-100 transition">
@@ -209,7 +209,7 @@ const StockDetailView: React.FC<{ item: StockItem; onClose: () => void; onEdit: 
             </div>
 
             {/* Bottom Action Bar */}
-            <div className="fixed bottom-0 w-full p-4 bg-white border-t border-gray-100 flex gap-3">
+            <div className="absolute bottom-0 w-full p-4 bg-white border-t border-gray-100 flex gap-3 z-30">
                  <button onClick={onDelete} className="flex-1 py-4 bg-red-50 text-red-600 font-bold rounded-2xl hover:bg-red-100 transition flex items-center justify-center gap-2">
                     <Trash2 size={18} /> {language === 'ta' ? 'நீக்குக' : 'Delete'}
                  </button>

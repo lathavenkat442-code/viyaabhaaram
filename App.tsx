@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { StockItem, Transaction, User, TransactionType, SizeStock, StockVariant } from './types';
+import { StockItem, Transaction, User, TransactionType, SizeStock, StockVariant, AppNotification } from './types';
 import { TRANSLATIONS, CATEGORIES, PREDEFINED_COLORS, SHIRT_SIZES } from './constants';
 import Dashboard from './components/Dashboard';
 import Inventory from './components/Inventory';
@@ -8,7 +8,7 @@ import Accounting from './components/Accounting';
 import Profile from './components/Profile';
 import { supabase, isSupabaseConfigured, saveSupabaseConfig } from './supabaseClient';
 import { 
-  LayoutDashboard, Package, ArrowLeftRight, User as UserIcon, PlusCircle, X, Camera, Trash2, Palette, ChevronDown, RefreshCw, Database, Loader2, WifiOff, CheckCircle2, AlertTriangle
+  LayoutDashboard, Package, ArrowLeftRight, User as UserIcon, PlusCircle, X, Camera, Trash2, Palette, ChevronDown, RefreshCw, Database, Loader2, WifiOff, CheckCircle2, AlertTriangle, Bell
 } from 'lucide-react';
 
 const EXPENSE_CATEGORIES = ['Salary', 'Rent', 'Tea/Snacks', 'Transport', 'Purchase', 'Sales', 'Electricity', 'Maintenance', 'Others'];
@@ -363,6 +363,40 @@ const AddStockModal: React.FC<{ onSave: (item: any, id?: string) => void; onClos
   );
 };
 
+const NotificationsPanel: React.FC<{ notifications: AppNotification[]; onClose: () => void; onMarkAllRead: () => void; language: 'ta' | 'en' }> = ({ notifications, onClose, onMarkAllRead, language }) => {
+  return (
+    <div className="fixed inset-0 bg-black/50 z-[100] flex justify-end animate-in fade-in duration-200">
+      <div className="bg-white w-full max-w-sm h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+        <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-indigo-600 text-white">
+          <h2 className="font-black text-lg tamil-font">{language === 'ta' ? 'அறிவிப்புகள்' : 'Notifications'}</h2>
+          <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-full transition"><X size={20} /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {notifications.length === 0 ? (
+            <div className="text-center text-gray-400 mt-10 font-bold tamil-font">
+              {language === 'ta' ? 'புதிய அறிவிப்புகள் இல்லை' : 'No new notifications'}
+            </div>
+          ) : (
+            notifications.map(n => (
+              <div key={n.id} className={`p-4 rounded-xl border ${n.read ? 'bg-gray-50 border-gray-100' : 'bg-indigo-50 border-indigo-100'}`}>
+                <p className="text-sm font-bold text-gray-800">{n.message}</p>
+                <p className="text-[10px] text-gray-400 mt-2">{new Date(n.timestamp).toLocaleString(language)}</p>
+              </div>
+            ))
+          )}
+        </div>
+        {notifications.some(n => !n.read) && (
+          <div className="p-4 border-t border-gray-100 bg-gray-50">
+            <button onClick={onMarkAllRead} className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl shadow-md">
+              {language === 'ta' ? 'அனைத்தையும் படித்ததாக குறி' : 'Mark all as read'}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'stock' | 'accounts' | 'profile'>('dashboard');
   const [stocks, setStocks] = useState<StockItem[]>([]);
@@ -379,8 +413,22 @@ const App: React.FC = () => {
   const [showDatabaseConfig, setShowDatabaseConfig] = useState(false);
   const [toast, setToast] = useState<{ msg: string, show: boolean, isError?: boolean }>({ msg: '', show: false });
   const [isAppLoading, setIsAppLoading] = useState(true);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   const getEmailKey = (email: string) => (email || 'guest').toLowerCase().replace(/[^a-z0-9]/g, '_');
+
+  const addNotification = useCallback((message: string) => {
+    const newNotif: AppNotification = { id: Date.now().toString(), message, timestamp: Date.now(), read: false };
+    setNotifications(prev => {
+        const updated = [newNotif, ...prev].slice(0, 50);
+        if (user) {
+            const emailKey = getEmailKey(user.email);
+            try { localStorage.setItem(`viyabaari_notifs_${emailKey}`, JSON.stringify(updated)); } catch(e) {}
+        }
+        return updated;
+    });
+  }, [user]);
 
   useEffect(() => {
     window.addEventListener('online', () => setIsOnline(true));
@@ -424,6 +472,9 @@ const App: React.FC = () => {
             if (lt) localT = JSON.parse(lt);
         }
         if (localT) setTransactions(localT);
+
+        const localN = localStorage.getItem(`viyabaari_notifs_${emailKey}`);
+        if (localN) setNotifications(JSON.parse(localN));
     } catch (e) { console.error("Local load failed"); }
 
     if (user.uid && isOnline && isSupabaseConfigured) {
@@ -503,6 +554,7 @@ const App: React.FC = () => {
         setIsAddingStock(false); 
         setEditingStock(null);
         setToast({ msg: language === 'ta' ? 'சரக்கு சேமிக்கப்பட்டது!' : 'Stock Saved!', show: true });
+        addNotification(language === 'ta' ? `சரக்கு ${id ? 'மாற்றப்பட்டது' : 'சேர்க்கப்பட்டது'}: ${newItem.name}` : `Stock ${id ? 'updated' : 'added'}: ${newItem.name}`);
     } catch (err) { 
         console.error("Save stock failed:", err);
         setToast({ msg: 'Error saving stock', show: true, isError: true }); 
@@ -548,6 +600,7 @@ const App: React.FC = () => {
         setIsAddingTransaction(false); 
         setEditingTransaction(null);
         setToast({ msg: language === 'ta' ? 'கணக்கு சேமிக்கப்பட்டது!' : 'Entry Saved!', show: true });
+        addNotification(language === 'ta' ? `கணக்கு ${id ? 'மாற்றப்பட்டது' : 'சேர்க்கப்பட்டது'}: ₹${newTxn.amount}` : `Transaction ${id ? 'updated' : 'added'}: ₹${newTxn.amount}`);
     } catch (err) { 
         console.error("Save transaction failed:", err);
         setToast({ msg: 'Error saving transaction', show: true, isError: true }); 
@@ -582,6 +635,7 @@ const App: React.FC = () => {
             await supabase.from('stock_items').delete().eq('id', id).eq('user_id', user.uid);
         }
         setToast({ msg: language === 'ta' ? 'பொருள் நீக்கப்பட்டது!' : 'Item Deleted!', show: true });
+        addNotification(language === 'ta' ? 'ஒரு பொருள் நீக்கப்பட்டது' : 'An item was deleted');
         return true;
     } catch (err) {
         console.error("Delete stock failed:", err);
@@ -602,6 +656,7 @@ const App: React.FC = () => {
        await supabase.from('transactions').delete().eq('user_id', user.uid);
     }
     setToast({ msg: language === 'ta' ? 'அனைத்தும் அழிக்கப்பட்டது' : 'Cleared all', show: true });
+    addNotification(language === 'ta' ? 'அனைத்து கணக்குகளும் அழிக்கப்பட்டன' : 'All transactions cleared');
   };
 
   const t = TRANSLATIONS[language];
@@ -624,6 +679,10 @@ const App: React.FC = () => {
         <div className="flex items-center gap-2"><h1 className="text-xl font-bold tamil-font truncate">{t.appName}</h1></div>
         <div className="flex gap-3 items-center">
             {isOnline && user.uid && <button onClick={() => fetchData(true)} className={`p-2 bg-white/10 hover:bg-white/20 rounded-full transition ${isSyncing ? 'animate-spin' : ''}`}><RefreshCw size={20} /></button>}
+            <button onClick={() => setShowNotifications(true)} className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition relative">
+              <Bell size={20}/>
+              {notifications.some(n => !n.read) && <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>}
+            </button>
             <button onClick={() => { setEditingStock(null); setIsAddingStock(true); }} className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition"><PlusCircle size={20}/></button>
             <button onClick={() => { setEditingTransaction(null); setIsAddingTransaction(true); }} className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition"><ArrowLeftRight size={20}/></button>
         </div>
@@ -636,12 +695,20 @@ const App: React.FC = () => {
             await supabase.auth.signOut(); 
             setUser(null); 
             localStorage.removeItem('viyabaari_active_user'); 
-            // Clear any other session data if needed
             sessionStorage.clear();
-            // Force reload to clear any in-memory state
             window.location.reload(); 
         }} onRestore={d => {}} language={language} onLanguageChange={(l) => { setLanguage(l); localStorage.setItem('viyabaari_lang', l); }} onClearTransactions={handleClearTransactions} onResetApp={() => {}} onSetupServer={() => setShowDatabaseConfig(true)} />}
       </main>
+      {showNotifications && <NotificationsPanel notifications={notifications} onClose={() => setShowNotifications(false)} onMarkAllRead={() => {
+          setNotifications(prev => {
+              const updated = prev.map(n => ({...n, read: true}));
+              if (user) {
+                  const emailKey = getEmailKey(user.email);
+                  try { localStorage.setItem(`viyabaari_notifs_${emailKey}`, JSON.stringify(updated)); } catch(e) {}
+              }
+              return updated;
+          });
+      }} language={language} />}
       {showDatabaseConfig && <DatabaseConfigModal onClose={() => setShowDatabaseConfig(false)} language={language} />}
       {isAddingStock && <AddStockModal onSave={saveStock} onClose={() => setIsAddingStock(false)} initialData={editingStock || undefined} language={language} t={t} />}
       {isAddingTransaction && <AddTransactionModal onSave={saveTransaction} onClose={() => setIsAddingTransaction(false)} initialData={editingTransaction || undefined} language={language} t={t} />}
